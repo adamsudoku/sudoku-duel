@@ -1462,15 +1462,6 @@ input[type=range]::-moz-range-thumb {
 <!-- ============ TOAST ============ -->
 <div class="toast" id="toast"></div>
 
-<!-- ============ DIAGNOSTIC PANEL (visible logging when bugs strike) ============ -->
-<div id="debug-panel" style="display:none; position:fixed; bottom:8px; left:8px; right:8px; max-height:50vh; overflow-y:auto; background:rgba(20,25,40,0.96); color:#e8f1ff; font-family:'Inter Tight',sans-serif; font-size:11px; line-height:1.4; padding:10px 12px; border-radius:8px; z-index:9999; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.15);">
-    <strong style="color:#ffb380;">Debug log</strong>
-    <button onclick="document.getElementById('debug-panel').style.display='none'" style="background:transparent; color:#e8f1ff; border:1px solid rgba(255,255,255,0.3); border-radius:4px; padding:2px 8px; font-size:11px; cursor:pointer;">Hide</button>
-  </div>
-  <div id="debug-log"></div>
-</div>
-
 <!-- ============ FOOTER ============ -->
 <div class="footer-link" style="max-width:540px; margin:0 auto;">
   Built for two.
@@ -1575,30 +1566,6 @@ function toast(msg, ms = 1800) {
   t.classList.add("show");
   clearTimeout(t._tm);
   t._tm = setTimeout(() => t.classList.remove("show"), ms);
-}
-
-// On-screen debug logger (visible panel at the bottom). Use this for diagnostics
-// the user might need to see/screenshot. The panel auto-shows when anything is logged.
-function dbgLog(label, data) {
-  try {
-    const panel = document.getElementById("debug-panel");
-    const log = document.getElementById("debug-log");
-    if (!panel || !log) return;
-    const time = new Date().toLocaleTimeString();
-    const line = document.createElement("div");
-    line.style.cssText = "margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed rgba(255,255,255,0.1); word-break:break-word;";
-    let detail = "";
-    if (data !== undefined) {
-      try { detail = " " + JSON.stringify(data); } catch (_) { detail = " [unserialisable]"; }
-    }
-    line.innerHTML = '<span style="color:#a0c8ff;">' + time + '</span> <strong style="color:#ffb380;">' + label + '</strong>' + detail;
-    log.appendChild(line);
-    panel.style.display = "block";
-    // Keep panel scrolled to the bottom
-    panel.scrollTop = panel.scrollHeight;
-    // Console too, for anyone who is using devtools
-    if (window.console && console.log) console.log("[" + label + "]", data);
-  } catch (_) {}
 }
 
 function fmtTime(seconds) {
@@ -2041,21 +2008,18 @@ const Keybinds = (() => {
    INIT
    ============================================================ */
 
-// Surface unexpected errors so they don't silently kill the UI. Shows a toast
-// AND logs to the visible debug panel + console.
+// Surface unexpected errors so they don't silently kill the UI.
 window.addEventListener("error", (e) => {
   try {
     const where = e.filename ? ` (${e.filename.split('/').pop()}:${e.lineno})` : '';
     const msg = (e.error && e.error.message) || e.message || "Unknown error";
     if (typeof toast === "function") toast("⚠ " + msg + where, 6000);
-    if (typeof dbgLog === "function") dbgLog("JS ERROR", msg + where);
   } catch (_) {}
 });
 window.addEventListener("unhandledrejection", (e) => {
   try {
     const msg = (e.reason && (e.reason.message || e.reason.code)) || String(e.reason || "Unknown");
     if (typeof toast === "function") toast("⚠ Promise error: " + msg, 6000);
-    if (typeof dbgLog === "function") dbgLog("PROMISE ERROR", msg);
   } catch (_) {}
 });
 
@@ -3625,10 +3589,8 @@ function enterNumber(n) {
     flashError(r, c);
     if (isNewMistake) {
       State.mistakes++;
-      dbgLog("MISTAKE", { now: State.mistakes, limit: State.room.game.mistakeLimit });
       pushProgress();
       if (State.room.game.mistakeLimit > 0 && State.mistakes >= State.room.game.mistakeLimit) {
-        dbgLog("MISTAKE-OUT (from enterNumber)");
         onLostByMistakes();
       }
     }
@@ -3761,12 +3723,6 @@ function renderOpponentsStrip(room) {
     const freebiesTotal = myHintData.freebiesReceived || 0;
     if (freebiesTotal > State.lastAcknowledgedFreebies) {
       const delta = freebiesTotal - State.lastAcknowledgedFreebies;
-      dbgLog("FREEBIE detected", {
-        freebiesTotalFromDB: freebiesTotal,
-        lastAckBefore: State.lastAcknowledgedFreebies,
-        delta,
-        currentlyFilled: getFilledCount()
-      });
       // CRITICAL: update this BEFORE the reveal loop, because revealCellAsHint writes
       // to the DB, which re-fires this listener. If we updated after the loop, the
       // re-entrant call would see lastAcknowledgedFreebies still at the old value and
