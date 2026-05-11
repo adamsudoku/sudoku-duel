@@ -2031,21 +2031,22 @@ function init() {
   restoreLastRivalry();
 
   // If the URL has a ?join=CODE parameter, the user came from an invite link.
-  // Show the banner with the pre-filled code so they know what to do.
+  // Hide everything except a single "Join duel" button that goes straight in.
   const params = new URLSearchParams(location.search);
   const inviteCode = (params.get("join") || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
   if (inviteCode.length === 4) {
     State._pendingInviteCode = inviteCode;
     $("#invite-banner-code").textContent = inviteCode;
     $("#invite-banner").style.display = "flex";
-    // Pre-fill the join input so the user just has to click "Join with code"
-    $("#join-code").value = inviteCode;
-    // Make the secondary join button look primary, and vice versa
+    // Hide the normal "Create new duel" button — they arrived from a link, they're joining
+    $("#btn-create").style.display = "none";
+    // Repurpose "Join with code" as the direct-join button.
+    $("#btn-join-open").textContent = "Join duel";
     $("#btn-join-open").classList.remove("btn-secondary");
     $("#btn-join-open").classList.add("btn-primary");
-    $("#btn-create").classList.remove("btn-primary");
-    $("#btn-create").classList.add("btn-secondary");
-    // If they have a saved name already, focus the join button; otherwise the name field
+    // Pre-fill the join input behind the scenes (the bindHomeEvents handler reads this too)
+    $("#join-code").value = inviteCode;
+    // Focus name field if empty, otherwise the join button
     if (savedName) {
       setTimeout(() => $("#btn-join-open").focus(), 100);
     } else {
@@ -2218,6 +2219,12 @@ function bindHomeEvents() {
   $("#btn-create").addEventListener("click", onCreateRoom);
   $("#btn-join-open").addEventListener("click", () => {
     if (!validateName()) return;
+    // If we arrived via an invite link, skip the join screen entirely and join directly.
+    if (State._pendingInviteCode && State._pendingInviteCode.length === 4) {
+      $("#join-code").value = State._pendingInviteCode;
+      onJoinConfirm();
+      return;
+    }
     showScreen("screen-join");
     $("#join-code").value = "";
     $("#join-error").style.display = "none";
@@ -2706,11 +2713,23 @@ async function onJoinConfirm() {
 
   const roomRef = FB.ref(DB, `rooms/${code}`);
 
+  // Pre-flight read so we can give a friendly "no such room" error.
+  // (We can't fully rely on transactions for this because the first transaction
+  // attempt sometimes sees a stale null even when the room exists on the server.)
+  const preSnap = await FB.get(roomRef);
+  if (!preSnap.exists()) {
+    $("#join-error").textContent = "No room with that code.";
+    $("#join-error").style.display = "block";
+    return;
+  }
+
   // Use a transaction so we read & write atomically, preventing two people
   // from both passing the "room not full" check and squeezing in as a third.
   let joinError = null;
   const result = await FB.runTransaction(roomRef, (room) => {
-    if (!room) { joinError = "No room with that code."; return; }
+    // If room comes back null here, that's almost always a stale cache — return undefined
+    // to let Firebase retry against the server, NOT to abort with "no room".
+    if (room === null) return;  // Firebase will retry with fresh server data
     if (room.status === "ended") { joinError = "That duel has already ended."; return; }
     if (room.status === "playing") { joinError = "That duel is already in progress."; return; }
     const players = room.players || {};
@@ -2731,8 +2750,14 @@ async function onJoinConfirm() {
     return room;
   });
 
-  if (joinError || !result || !result.committed) {
-    $("#join-error").textContent = joinError || "Couldn't join — try again.";
+  if (joinError) {
+    $("#join-error").textContent = joinError;
+    $("#join-error").style.display = "block";
+    return;
+  }
+  if (!result || !result.committed) {
+    // Transaction failed without setting joinError — most likely a rules denial.
+    $("#join-error").textContent = "Couldn't join — try again, or ask the host to recreate the room.";
     $("#join-error").style.display = "block";
     return;
   }
