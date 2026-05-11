@@ -1,0 +1,3735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Sudoku Duel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f1ea;
+  --bg-elevated: #fbf8f3;
+  --ink: #1a2238;
+  --ink-soft: #4a5468;
+  --ink-faint: #8a93a8;
+  --line: #d9d2c4;
+  --line-strong: #1a2238;
+  --accent: #c8553d;
+  --accent-soft: #e8d5cf;
+  --given: #1a2238;
+  --user: #c8553d;
+  --highlight: #ede5d4;
+  --highlight-strong: #e3d9c2;
+  --error: #d4574e;
+  --success: #5c8a5a;
+  --selected: #f0e4cc;
+  --note: #8a93a8;
+  --shadow-soft: 0 1px 2px rgba(26, 34, 56, 0.04), 0 4px 12px rgba(26, 34, 56, 0.04);
+  --shadow-md: 0 2px 4px rgba(26, 34, 56, 0.06), 0 12px 32px rgba(26, 34, 56, 0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(200, 85, 61, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 90% 90%, rgba(26, 34, 56, 0.03) 0%, transparent 50%);
+}
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input { font-family: inherit; }
+
+.container {
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+  min-height: 100vh;
+}
+
+/* ===== SCREENS ===== */
+.screen { display: none; animation: fadeIn 0.35s ease; position: relative; }
+.screen.active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== HOME SCREEN ===== */
+.brand {
+  text-align: center;
+  margin: 32px 0 48px;
+}
+
+.brand h1 {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 52px;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  font-variation-settings: "opsz" 144;
+}
+
+.brand .accent { color: var(--accent); font-style: italic; }
+
+.brand p {
+  color: var(--ink-soft);
+  font-size: 15px;
+  margin-top: 10px;
+  letter-spacing: 0.2px;
+}
+
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 32px;
+}
+
+.btn {
+  padding: 18px 24px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--bg-elevated);
+  box-shadow: var(--shadow-soft);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.btn-secondary:hover { border-color: var(--ink-soft); }
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--bg-elevated);
+  box-shadow: var(--shadow-soft);
+}
+.btn-accent:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn-accent:disabled { opacity: 0.4; transform: none; cursor: not-allowed; }
+
+.btn-ghost {
+  color: var(--ink-soft);
+  padding: 10px 16px;
+  font-size: 14px;
+}
+.btn-ghost:hover { color: var(--ink); }
+
+.rivalry-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 20px 18px;
+  margin-top: 32px;
+}
+
+.rivalry-header {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 18px;
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+}
+.rivalry-name {
+  color: var(--ink);
+}
+.rivalry-vs {
+  font-size: 13px;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+.rivalry-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 4px;
+  border-top: 1px solid var(--line);
+}
+.rivalry-row:first-of-type { border-top: none; padding-top: 4px; }
+
+.rivalry-row-label {
+  font-size: 12px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.rivalry-row-score {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+}
+.rivalry-row-score .leading { color: var(--accent); }
+
+.rivalry-footnote {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--ink-faint);
+  text-align: center;
+  font-style: italic;
+}
+
+.rivalry-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.btn-tiny {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+.btn-tiny:hover { border-color: var(--ink-soft); color: var(--ink); }
+.btn-tiny-accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-elevated);
+}
+.btn-tiny-accent:hover { color: var(--bg-elevated); background: #b54731; border-color: #b54731; }
+
+.rivalry-history {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.rivalry-history h4 {
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 2px;
+  font-size: 13px;
+}
+.history-row + .history-row { border-top: 1px solid var(--line); }
+.history-row .month-name { color: var(--ink-soft); }
+.history-row .month-result {
+  font-family: 'Fraunces', serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+.history-row .month-winner {
+  font-size: 11px;
+  color: var(--accent);
+  margin-left: 8px;
+  font-style: italic;
+}
+.history-empty {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-style: italic;
+  padding: 12px 0;
+}
+
+.reset-pending {
+  margin-top: 16px;
+  padding: 14px;
+  background: rgba(200, 85, 61, 0.06);
+  border: 1px solid rgba(200, 85, 61, 0.3);
+  border-radius: 10px;
+}
+.reset-prompt {
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-align: center;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+.reset-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* ===== NAME / JOIN INPUT ===== */
+.field {
+  margin-bottom: 20px;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+
+.field input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 16px;
+  background: var(--bg-elevated);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+.field input:focus { border-color: var(--ink); }
+
+.code-input {
+  text-align: center;
+  font-family: 'Fraunces', serif;
+  font-size: 32px !important;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+  padding-left: 12px !important;
+}
+
+/* ===== LOBBY ===== */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.section-head h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+}
+
+.room-code-display {
+  text-align: center;
+  margin: 28px 0;
+  padding: 24px;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+}
+
+.room-code-display .label {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+
+.room-code-display .code {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 48px;
+  letter-spacing: 10px;
+  color: var(--ink);
+  cursor: pointer;
+  padding-left: 10px;
+}
+
+.room-code-display .hint {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-top: 8px;
+  font-style: italic;
+}
+
+/* ===== SETTINGS ===== */
+.settings-block {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.settings-block h3 {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+
+.difficulty-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.diff-btn {
+  padding: 10px 4px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  transition: all 0.15s ease;
+}
+.diff-btn:hover { border-color: var(--ink-soft); color: var(--ink); }
+.diff-btn.active {
+  background: var(--ink);
+  color: var(--bg-elevated);
+  border-color: var(--ink);
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.slider-row .clues-value {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 500;
+  min-width: 36px;
+  text-align: right;
+  color: var(--ink);
+}
+
+.slider-row .slider-label {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+
+input[type=range] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: var(--ink);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+}
+input[type=range]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: var(--ink);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+/* ===== READY PANELS ===== */
+.players-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.player-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.player-card.ready {
+  border-color: var(--success);
+  background: rgba(92, 138, 90, 0.06);
+}
+
+.player-card .you-tag {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.player-card .name {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.player-card .status {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.player-card.ready .status { color: var(--success); }
+
+.empty-slot {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--ink-faint);
+  font-style: italic;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+}
+
+.muted-note {
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-faint);
+  margin: 8px 0 20px;
+  font-style: italic;
+}
+
+.error-msg {
+  background: rgba(212, 87, 78, 0.08);
+  border: 1px solid rgba(212, 87, 78, 0.3);
+  color: var(--error);
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin: 12px 0;
+  text-align: center;
+}
+
+/* ===== GAME SCREEN ===== */
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.game-header .leave {
+  font-size: 13px;
+  color: var(--ink-faint);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.game-header .leave:hover { color: var(--ink); }
+
+.game-header .sound-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  transition: all 0.15s ease;
+}
+.game-header .sound-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--ink);
+}
+.game-header .sound-toggle.muted {
+  color: var(--ink-faint);
+}
+
+.game-header .room-code-mini {
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  letter-spacing: 4px;
+  color: var(--ink-soft);
+}
+
+.opponents-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.player-strip {
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s ease, background 0.25s ease;
+}
+
+.player-strip.you {
+  border-color: var(--accent-soft);
+}
+
+.player-strip .name-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.player-strip .player-name {
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+}
+
+.player-strip .timer {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+}
+
+.player-strip .meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.player-strip .meta-row + .meta-row {
+  margin-top: 3px;
+}
+
+.player-strip .mistakes-count.danger {
+  color: var(--error);
+  font-weight: 600;
+}
+
+/* Cells remaining indicator — big and bold when low */
+.player-strip .cells-left {
+  font-family: 'Fraunces', serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.player-strip .filled-pct {
+  color: var(--ink-faint);
+  font-weight: 400;
+  margin-left: 2px;
+}
+
+/* Warning state when opponent is closing in (<=10% cells unfilled) */
+.player-strip.opponent-warning {
+  animation: oppWarningFlash 1.6s ease-in-out 3;
+}
+@keyframes oppWarningFlash {
+  0%, 100% {
+    background: var(--bg-elevated);
+    border-color: var(--line);
+  }
+  50% {
+    background: rgba(212, 87, 78, 0.10);
+    border-color: var(--error);
+  }
+}
+
+/* Persistent (subtler) warning state after the initial flash */
+.player-strip.opponent-warning-sustained {
+  border-color: rgba(212, 87, 78, 0.4);
+  background: rgba(212, 87, 78, 0.04);
+}
+
+.progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--ink-soft);
+  transition: width 0.4s ease, background 0.3s ease;
+}
+.player-strip.you .progress-bar { background: var(--accent); }
+.player-strip.opponent-warning-sustained .progress-bar,
+.player-strip.opponent-warning .progress-bar {
+  background: var(--error);
+}
+
+/* ===== GRID ===== */
+.board-wrap {
+  background: var(--bg-elevated);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 18px;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  background: var(--bg-elevated);
+  /* Outer thick border closes the grid */
+  border: 2px solid var(--line-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cell {
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fraunces', serif;
+  font-size: clamp(20px, 5.5vw, 28px);
+  font-weight: 500;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  aspect-ratio: 1 / 1;
+  /* Default: thin line on right and bottom */
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Cells in the last column / last row: no right / bottom border (the .board's own border closes the grid) */
+.cell[data-col="8"] { border-right: none; }
+.cell[data-row="8"] { border-bottom: none; }
+
+/* Thick borders separating 3x3 blocks: right border of cols 2,5 and bottom border of rows 2,5 */
+.cell[data-col="2"], .cell[data-col="5"] { border-right: 2px solid var(--line-strong); }
+.cell[data-row="2"], .cell[data-row="5"] { border-bottom: 2px solid var(--line-strong); }
+
+.cell.given { color: var(--given); font-weight: 600; }
+.cell.user-filled { color: var(--user); }
+.cell.locked { color: var(--success); font-weight: 600; }
+
+.cell.highlighted-region { background: var(--highlight); }
+.cell.highlighted-number { background: var(--highlight-strong); }
+.cell.selected { background: var(--selected); }
+.cell.error-flash { animation: errorPulse 0.5s ease; }
+
+@keyframes errorPulse {
+  0%, 100% { background: var(--bg-elevated); }
+  50% { background: rgba(212, 87, 78, 0.25); }
+}
+
+.cell.entered { animation: entryPop 0.25s ease; }
+@keyframes entryPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* Notes inside a cell */
+.cell .notes {
+  position: absolute;
+  inset: 4px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 9px;
+  color: var(--note);
+  font-weight: 500;
+  pointer-events: none;
+}
+.cell .notes span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== NUMBER PAD ===== */
+.num-pad {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.num-btn {
+  aspect-ratio: 1 / 1.2;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+  position: relative;
+  transition: all 0.12s ease;
+}
+.num-btn:hover { border-color: var(--ink-soft); }
+.num-btn:active { transform: scale(0.94); }
+.num-btn.exhausted {
+  color: var(--ink-faint);
+  opacity: 0.4;
+}
+.num-btn .remaining {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 9px;
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+
+.tool-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.tool-row.no-hints {
+  grid-template-columns: 1fr 1fr;
+}
+
+.tool-btn .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 4px;
+  background: var(--accent);
+  color: var(--bg-elevated);
+  border-radius: 9px;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.tool-btn.active .badge {
+  background: var(--bg-elevated);
+  color: var(--ink);
+}
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tool-btn:disabled .badge {
+  background: var(--ink-faint);
+}
+
+.hint-pulse {
+  animation: hintPulse 0.6s ease;
+}
+@keyframes hintPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(200, 85, 61, 0.4); }
+  50% { transform: scale(1.04); box-shadow: 0 0 0 8px rgba(200, 85, 61, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(200, 85, 61, 0); }
+}
+
+.cell.hint-flash { animation: hintFlash 0.7s ease; }
+@keyframes hintFlash {
+  0% { background: var(--bg-elevated); }
+  30% { background: rgba(92, 138, 90, 0.35); }
+  100% { background: var(--bg-elevated); }
+}
+
+.cell.box-flash { animation: boxFlash 0.8s ease; }
+@keyframes boxFlash {
+  0% { background: var(--bg-elevated); transform: scale(1); }
+  30% { background: rgba(200, 85, 61, 0.3); transform: scale(1.06); }
+  100% { background: var(--bg-elevated); transform: scale(1); }
+}
+
+.tool-btn {
+  padding: 12px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.12s ease;
+}
+.tool-btn:hover { border-color: var(--ink-soft); color: var(--ink); }
+.tool-btn.active {
+  background: var(--ink);
+  color: var(--bg-elevated);
+  border-color: var(--ink);
+}
+
+.tool-btn svg { width: 16px; height: 16px; }
+
+/* ===== MODAL / END SCREEN ===== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 34, 56, 0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+}
+.modal-backdrop.active {
+  display: flex;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal {
+  background: var(--bg-elevated);
+  border-radius: 18px;
+  padding: 36px 28px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+}
+
+.modal .result-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 12px;
+}
+
+.modal .result-title {
+  font-family: 'Fraunces', serif;
+  font-size: 42px;
+  font-weight: 500;
+  letter-spacing: -1px;
+  margin-bottom: 6px;
+  font-style: italic;
+}
+
+.modal.win .result-title { color: var(--success); }
+.modal.loss .result-title { color: var(--accent); }
+.modal.draw .result-title { color: var(--ink-soft); }
+
+.modal .result-sub {
+  color: var(--ink-soft);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.result-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+.stat-card {
+  background: var(--bg);
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+.stat-card.winner { border-color: var(--success); }
+
+.stat-card .who {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 4px;
+}
+.stat-card .who.you-tag { color: var(--accent); }
+
+.stat-card .value {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.stat-card .detail {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ===== WAITING SPINNER ===== */
+.waiting-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  margin: 0 2px;
+  animation: dot-bounce 1.4s infinite ease-in-out both;
+}
+.waiting-dot:nth-child(1) { animation-delay: -0.32s; }
+.waiting-dot:nth-child(2) { animation-delay: -0.16s; }
+@keyframes dot-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* ===== TOAST ===== */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(120%);
+  background: var(--ink);
+  color: var(--bg-elevated);
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 200;
+  transition: transform 0.3s ease;
+  box-shadow: var(--shadow-md);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ===== FOOTER ===== */
+.footer-link {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.footer-link a { color: var(--ink-soft); text-decoration: underline; }
+
+.home-gear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--ink-soft);
+  background: transparent;
+  transition: all 0.15s ease;
+  z-index: 5;
+}
+.home-gear:hover {
+  background: var(--bg-elevated);
+  color: var(--ink);
+  transform: rotate(30deg);
+}
+
+.keybind-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 4px;
+  border-top: 1px solid var(--line);
+}
+.keybind-row:first-of-type { border-top: none; padding-top: 4px; }
+
+.keybind-label {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.keybind-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--line);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.keybind-btn:hover { border-color: var(--ink-soft); }
+
+.keybind-key {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 24px;
+  text-align: center;
+  padding: 2px 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  color: var(--ink);
+}
+
+.keybind-edit {
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--line);
+  border-radius: 24px;
+  transition: background 0.2s ease;
+}
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--accent);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+/* small phones */
+@media (max-width: 380px) {
+  .brand h1 { font-size: 42px; }
+  .cell { font-size: 18px; }
+  .num-btn { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+
+
+<div class="container">
+
+  <!-- ============ HOME SCREEN ============ -->
+  <section id="screen-home" class="screen active">
+    <button class="home-gear" id="btn-open-settings" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <div class="brand">
+      <h1>Sudoku <span class="accent">Duel</span></h1>
+      <p>A race against your favourite rival.</p>
+    </div>
+
+    <div class="field">
+      <label for="player-name">Your name</label>
+      <input type="text" id="player-name" maxlength="20" placeholder="e.g. Alex" autocomplete="off" />
+    </div>
+
+    <div class="home-actions">
+      <button class="btn btn-primary" id="btn-create">Create new duel</button>
+      <button class="btn btn-secondary" id="btn-join-open">Join with code</button>
+    </div>
+
+  </section>
+
+  <!-- ============ SETTINGS SCREEN ============ -->
+  <section id="screen-settings" class="screen">
+    <div class="section-head">
+      <h2>Settings</h2>
+      <button class="btn-ghost" id="btn-settings-back">← Back</button>
+    </div>
+
+    <div class="settings-block">
+      <h3>Sound</h3>
+      <div class="keybind-row">
+        <span class="keybind-label">Game sounds</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="sound-enabled-toggle" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="keybind-row" id="volume-row">
+        <span class="keybind-label">Volume</span>
+        <div style="display:flex; align-items:center; gap:10px; flex:1; max-width:200px;">
+          <input type="range" id="sound-volume-slider" min="0" max="100" value="50" style="flex:1;" />
+          <span class="keybind-key" id="sound-volume-value" style="min-width:36px;">50</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Keyboard shortcuts</h3>
+      <p style="font-size:12px; color:var(--ink-faint); margin-bottom:14px; line-height:1.5;">
+        Customise the keys for action buttons during a duel. Number keys (1–9), Backspace, and arrow keys stay standard.
+      </p>
+
+      <div class="keybind-row">
+        <span class="keybind-label">Erase</span>
+        <button class="keybind-btn" data-action="erase">
+          <span class="keybind-key" id="key-erase">Backspace</span>
+          <span class="keybind-edit">Change</span>
+        </button>
+      </div>
+
+      <div class="keybind-row">
+        <span class="keybind-label">Toggle notes</span>
+        <button class="keybind-btn" data-action="notes">
+          <span class="keybind-key" id="key-notes">N</span>
+          <span class="keybind-edit">Change</span>
+        </button>
+      </div>
+
+      <div class="keybind-row">
+        <span class="keybind-label">Hint</span>
+        <button class="keybind-btn" data-action="hint">
+          <span class="keybind-key" id="key-hint">H</span>
+          <span class="keybind-edit">Change</span>
+        </button>
+      </div>
+
+      <button class="btn-tiny" id="btn-reset-keybinds" style="margin-top:16px;">Reset to defaults</button>
+    </div>
+  </section>
+
+  <!-- ============ KEYBIND CAPTURE MODAL ============ -->
+  <div class="modal-backdrop" id="keybind-modal-backdrop">
+    <div class="modal">
+      <div class="result-label">REBIND</div>
+      <div class="result-title" id="keybind-modal-title" style="font-size:28px;">Press a key…</div>
+      <p class="result-sub" id="keybind-modal-sub">For: <span id="keybind-modal-action"></span></p>
+      <p style="font-size:12px; color:var(--ink-faint); margin-bottom:20px;">
+        Pick any letter, symbol, or punctuation. Number keys, arrows, and Enter are reserved.
+      </p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btn-keybind-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ JOIN SCREEN ============ -->
+  <section id="screen-join" class="screen">
+    <div class="section-head">
+      <h2>Join duel</h2>
+      <button class="btn-ghost" id="btn-join-back">← Back</button>
+    </div>
+
+    <div class="field">
+      <label for="join-code">Room code</label>
+      <input type="text" id="join-code" class="code-input" maxlength="4" placeholder="····" autocomplete="off" />
+    </div>
+
+    <div id="join-error" class="error-msg" style="display:none;"></div>
+
+    <button class="btn btn-primary" id="btn-join-confirm">Enter room</button>
+  </section>
+
+  <!-- ============ LOBBY SCREEN ============ -->
+  <section id="screen-lobby" class="screen">
+    <div class="section-head">
+      <h2 id="lobby-title">Duel lobby</h2>
+      <button class="btn-ghost" id="btn-leave-lobby">← Leave</button>
+    </div>
+
+    <div class="room-code-display">
+      <div class="label">Share this code</div>
+      <div class="code" id="lobby-code" title="Tap to copy">····</div>
+      <div class="hint">Tap to copy</div>
+    </div>
+
+    <div class="players-row" id="players-row">
+      <!-- player cards injected -->
+    </div>
+
+    <div class="rivalry-card" id="rivalry-card" style="display:none;">
+      <div class="rivalry-header">
+        <span class="rivalry-name" id="rivalry-name-1">You</span>
+        <span class="rivalry-vs">vs</span>
+        <span class="rivalry-name" id="rivalry-name-2">Rival</span>
+      </div>
+
+      <div class="rivalry-row" id="rivalry-row-alltime">
+        <span class="rivalry-row-label">All-time</span>
+        <span class="rivalry-row-score"><span id="alltime-wins">0</span> — <span id="alltime-losses">0</span></span>
+      </div>
+
+      <div class="rivalry-row" id="rivalry-row-month">
+        <span class="rivalry-row-label" id="month-label">This month</span>
+        <span class="rivalry-row-score"><span id="month-wins">0</span> — <span id="month-losses">0</span></span>
+      </div>
+
+      <div class="rivalry-footnote" id="last-month-line" style="display:none;"></div>
+
+      <div class="rivalry-actions">
+        <button class="btn-tiny" id="btn-show-history">Past months</button>
+        <div style="display:flex; gap:6px;">
+          <button class="btn-tiny" id="btn-request-reset-month">Reset month</button>
+          <button class="btn-tiny" id="btn-request-reset">Reset all-time</button>
+        </div>
+      </div>
+
+      <div class="rivalry-history" id="rivalry-history" style="display:none;"></div>
+
+      <div class="reset-pending" id="reset-pending" style="display:none;">
+        <p class="reset-prompt" id="reset-prompt-text"></p>
+        <div class="reset-actions">
+          <button class="btn-tiny btn-tiny-accent" id="btn-reset-confirm">Confirm reset</button>
+          <button class="btn-tiny" id="btn-reset-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Difficulty</h3>
+      <div class="difficulty-grid" id="difficulty-grid">
+        <button class="diff-btn" data-diff="easy">Easy</button>
+        <button class="diff-btn" data-diff="medium">Medium</button>
+        <button class="diff-btn" data-diff="hard">Hard</button>
+        <button class="diff-btn" data-diff="expert">Expert</button>
+      </div>
+      <div class="slider-row">
+        <span class="clues-value" id="clues-value">36</span>
+        <input type="range" id="clues-slider" min="17" max="50" value="36" />
+        <span class="slider-label">clues</span>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Mistake limit</h3>
+      <div class="slider-row">
+        <span class="clues-value" id="mistakes-value">3</span>
+        <input type="range" id="mistakes-slider" min="0" max="10" value="3" />
+        <span class="slider-label" id="mistakes-label">mistakes</span>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Hints per duel</h3>
+      <div class="slider-row">
+        <span class="clues-value" id="hints-value">3</span>
+        <input type="range" id="hints-slider" min="0" max="10" value="3" />
+        <span class="slider-label" id="hints-label">hints</span>
+      </div>
+      <p style="font-size:11px; color:var(--ink-faint); margin-top:10px; line-height:1.5; font-style:italic;">
+        Using a hint reveals one cell — but your opponent also gets a free hint added to their pool.
+      </p>
+    </div>
+
+    <p class="muted-note" id="ready-hint">Both players must hit ready to begin.</p>
+
+    <button class="btn btn-accent" id="btn-ready">I'm ready</button>
+  </section>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <section id="screen-game" class="screen">
+    <div class="game-header">
+      <button class="leave" id="btn-leave-game">← Leave</button>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <button class="sound-toggle" id="btn-sound-toggle" aria-label="Toggle sound" title="Toggle sound">
+          <svg id="icon-sound-on" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          <svg id="icon-sound-off" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        </button>
+        <span class="room-code-mini" id="game-room-code"></span>
+      </div>
+    </div>
+
+    <div class="opponents-strip" id="opponents-strip">
+      <!-- player strips injected -->
+    </div>
+
+    <div class="board-wrap">
+      <div class="board" id="board"></div>
+    </div>
+
+    <div class="num-pad" id="num-pad"></div>
+
+    <div class="tool-row" id="tool-row">
+      <button class="tool-btn" id="btn-erase">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L21 10C21.5 10.5 21.5 11.5 21 12L11 22"/><line x1="18" y1="13" x2="9" y2="4"/></svg>
+        Erase
+      </button>
+      <button class="tool-btn" id="btn-notes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="6" cy="7" r="1.5"/></svg>
+        Notes <span id="notes-state">OFF</span>
+      </button>
+      <button class="tool-btn" id="btn-hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.9.8 1 1.4 1 2.3v1h6v-1c0-.9.1-1.5 1-2.3A7 7 0 0 0 12 2z"/></svg>
+        Hint<span class="badge" id="hint-badge">0</span>
+      </button>
+    </div>
+  </section>
+
+</div>
+
+<!-- ============ END-GAME MODAL ============ -->
+<div class="modal-backdrop" id="end-modal-backdrop">
+  <div class="modal" id="end-modal">
+    <div class="result-label" id="result-label">RESULT</div>
+    <div class="result-title" id="result-title">—</div>
+    <div class="result-sub" id="result-sub"></div>
+
+    <div class="result-stats" id="result-stats"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-accent" id="btn-rematch">Rematch</button>
+      <button class="btn btn-secondary" id="btn-home-from-end">Back to home</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div class="toast" id="toast"></div>
+
+<!-- ============ FOOTER ============ -->
+<div class="footer-link" style="max-width:540px; margin:0 auto;">
+  Built for two.
+</div>
+
+<!-- ===================================================================
+     FIREBASE SDK + APP LOGIC
+     =================================================================== -->
+
+<!-- Firebase SDK (Realtime Database) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getDatabase, ref, set, get, update, onValue, onDisconnect, remove, off, serverTimestamp, runTransaction
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  // ============================================================
+  // CONFIG  ←  REPLACE THIS BLOCK WITH YOUR OWN FIREBASE CONFIG
+  // ============================================================
+  const firebaseConfig = {
+  apiKey: "AIzaSyBhrR71GNPDRrouwn6n4bc-pFovcDWMSJ4",
+  authDomain: "sudoku-duel-19bdf.firebaseapp.com",
+  databaseURL: "https://sudoku-duel-19bdf-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "sudoku-duel-19bdf",
+  storageBucket: "sudoku-duel-19bdf.firebasestorage.app",
+  messagingSenderId: "362857486779",
+  appId: "1:362857486779:web:ebed687a6f9f1db5264c9e"
+  };
+
+  // Expose Firebase to the non-module script below
+  window.__firebase = {
+    initializeApp, getDatabase, ref, set, get, update, onValue, onDisconnect, remove, off, serverTimestamp, runTransaction,
+    config: firebaseConfig
+  };
+  window.__firebaseReady = true;
+  if (window.__dlog) window.__dlog('Firebase SDK module loaded');
+  // If the non-module script has already loaded and is waiting, kick it off now.
+  if (typeof window.__onFirebaseReady === "function") {
+    if (window.__dlog) window.__dlog('Calling waiting bootstrap callback');
+    window.__onFirebaseReady();
+  } else {
+    if (window.__dlog) window.__dlog('No callback yet — non-module script will pick up on its own');
+  }
+</script>
+
+<script>
+/* ============================================================
+   SUDOKU DUEL — single-file app
+   ============================================================ */
+
+let FB = null;       // firebase namespace
+let DB = null;       // database instance
+let CONFIGURED = false;
+
+function bootstrap() {
+  if (window.__dlog) window.__dlog('bootstrap() called');
+  FB = window.__firebase;
+  if (!FB) {
+    if (window.__dlog) window.__dlog('FB not ready yet, retrying in 50ms');
+    setTimeout(bootstrap, 50);
+    return;
+  }
+  if (window.__dlog) window.__dlog('FB namespace acquired. config apiKey: ' + (FB.config.apiKey === 'REPLACE_ME' ? 'REPLACE_ME (not configured!)' : 'looks set'));
+  if (FB.config.apiKey !== "REPLACE_ME") {
+    try {
+      const app = FB.initializeApp(FB.config);
+      if (window.__dlog) window.__dlog('Firebase app initialized');
+      DB = FB.getDatabase(app);
+      if (window.__dlog) window.__dlog('Database handle obtained');
+      CONFIGURED = true;
+    } catch (e) {
+      console.error("Firebase init failed", e);
+      if (window.__dlog) window.__dlog('Firebase init FAILED: ' + e.message, true);
+      alert("Firebase failed to initialize: " + (e.message || e));
+    }
+  }
+  if (window.__dlog) window.__dlog('Calling init(). CONFIGURED=' + CONFIGURED);
+  init();
+}
+
+// Set up a callback the module script can invoke if it's still loading
+window.__onFirebaseReady = bootstrap;
+
+// Also try right now in case the module already finished loading before we got here
+if (window.__dlog) window.__dlog('Non-module script reached end. firebaseReady=' + !!window.__firebaseReady);
+if (window.__firebaseReady) {
+  bootstrap();
+}
+
+/* ---------- Utilities ---------- */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+function showScreen(id) {
+  $$(".screen").forEach(s => s.classList.remove("active"));
+  $("#" + id).classList.add("active");
+}
+
+function toast(msg, ms = 1800) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._tm);
+  t._tm = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+function fmtTime(seconds) {
+  if (seconds == null || seconds < 0) seconds = 0;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function randomCode(len = 4) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I, O
+  let s = "";
+  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+/* ---------- Seeded RNG (mulberry32) ---------- */
+function seedFromString(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = seed;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function shuffled(arr, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ---------- Sudoku generation ----------
+   Generates a full solved board with seeded RNG by:
+   1. Starting from a canonical solved grid
+   2. Permuting digits (1-9 -> some permutation)
+   3. Permuting rows within bands, columns within stacks,
+      and bands/stacks themselves — all preserve sudoku validity
+   Then we dig out cells deterministically to leave the desired
+   number of clues.
+*/
+
+function canonicalSolution() {
+  // Standard canonical Sudoku pattern: value(r,c) = (3*(r mod 3) + floor(r/3) + c) mod 9 + 1.
+  // Guarantees that rows, columns, and 3x3 boxes are all permutations of 1..9.
+  const g = [];
+  for (let r = 0; r < 9; r++) {
+    g.push([]);
+    for (let c = 0; c < 9; c++) {
+      const val = ((3 * (r % 3) + Math.floor(r / 3) + c) % 9) + 1;
+      g[r].push(val);
+    }
+  }
+  return g;
+}
+
+function generateSolved(seed) {
+  const rng = mulberry32(seed);
+  let g = canonicalSolution();
+
+  // Permute digits
+  const digitPerm = shuffled([1,2,3,4,5,6,7,8,9], rng);
+  g = g.map(row => row.map(v => digitPerm[v - 1]));
+
+  // Permute rows within bands
+  for (let band = 0; band < 3; band++) {
+    const rows = [band*3, band*3+1, band*3+2];
+    const order = shuffled(rows, rng);
+    const newRows = order.map(r => g[r]);
+    newRows.forEach((row, i) => { g[band*3 + i] = row; });
+  }
+
+  // Permute columns within stacks
+  for (let stack = 0; stack < 3; stack++) {
+    const cols = [stack*3, stack*3+1, stack*3+2];
+    const order = shuffled(cols, rng);
+    g = g.map(row => {
+      const newRow = row.slice();
+      order.forEach((c, i) => { newRow[stack*3 + i] = row[c]; });
+      return newRow;
+    });
+  }
+
+  // Permute bands themselves
+  {
+    const bands = [0, 1, 2];
+    const order = shuffled(bands, rng);
+    const newG = [];
+    order.forEach(b => {
+      for (let i = 0; i < 3; i++) newG.push(g[b*3 + i]);
+    });
+    g = newG;
+  }
+
+  // Permute stacks
+  {
+    const stacks = [0, 1, 2];
+    const order = shuffled(stacks, rng);
+    g = g.map(row => {
+      const newRow = [];
+      order.forEach(s => {
+        for (let i = 0; i < 3; i++) newRow.push(row[s*3 + i]);
+      });
+      return newRow;
+    });
+  }
+
+  return g;
+}
+
+function makePuzzle(seedStr, clueCount) {
+  const seed = seedFromString(seedStr);
+  const rng = mulberry32(seed ^ 0xA5A5A5A5);
+  const solution = generateSolved(seed);
+
+  // Build list of 81 cell indices, shuffle, then keep `clueCount` and blank rest
+  const indices = shuffled(Array.from({length: 81}, (_, i) => i), rng);
+  const puzzle = solution.map(row => row.slice());
+  const removeCount = 81 - clueCount;
+  for (let i = 0; i < removeCount; i++) {
+    const idx = indices[i];
+    const r = Math.floor(idx / 9);
+    const c = idx % 9;
+    puzzle[r][c] = 0;
+  }
+
+  // Symmetry pass: ensure if (r,c) is blank, (8-r, 8-c) is also blank — purely cosmetic
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (puzzle[r][c] === 0) {
+        // keep its symmetric counterpart blank too (don't restore here; cosmetic only)
+      }
+    }
+  }
+
+  return { puzzle, solution };
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+
+const State = {
+  playerName: "",
+  playerId: uid(),
+  roomCode: null,
+  isCreator: false,
+
+  // Mirror of room/{code} in DB (or local for solo-debug)
+  room: null,
+
+  // Local game state
+  cells: null,        // 9x9 of {value, given, locked, notes:Set}
+  solution: null,
+  selected: null,     // {r, c}
+  notesMode: false,
+  mistakes: 0,
+  hintsRemainingOwn: 0,
+  hintsRemainingGifted: 0,
+  hintsUsedOwn: 0,
+  hintsUsedGifted: 0,
+  lastSeenGiftReceivedTotal: 0,  // tracks total gifts received (own.usedOwn from opponent) for toast detection
+  startedAtMs: null,
+  timerInterval: null,
+  finishedAt: null,
+  lostByMistakes: false,
+
+  // For lobby UI
+  unsubRoom: null,
+  unsubMyPresence: null,
+};
+
+/* ============================================================
+   SOUND ENGINE — Web Audio synthesized tones, no external files
+   ============================================================ */
+
+const Sound = (() => {
+  let ctx = null;
+  let masterGain = null;
+  let enabled = localStorage.getItem("sd_sound") !== "0"; // default ON
+  let volume = parseInt(localStorage.getItem("sd_volume") ?? "50", 10) / 100; // 0..1
+  let lastTapAt = 0;
+
+  function ensureCtx() {
+    if (!enabled) return null;
+    if (!ctx) {
+      try {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = ctx.createGain();
+        masterGain.gain.value = volume;
+        masterGain.connect(ctx.destination);
+      } catch (e) {
+        console.warn("Web Audio unavailable", e);
+        return null;
+      }
+    }
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    return ctx;
+  }
+
+  // Core helper: play a single tone with envelope.
+  function tone({ freq, type = "sine", duration = 0.15, attack = 0.005, decay = 0.08, sustain = 0.6, release = 0.08, gain = 0.18, freqEnd = null }) {
+    const c = ensureCtx();
+    if (!c) return;
+    const t0 = c.currentTime;
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (freqEnd != null) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 1), t0 + duration);
+    }
+    // ADSR envelope
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(gain, t0 + attack);
+    g.gain.linearRampToValueAtTime(gain * sustain, t0 + attack + decay);
+    g.gain.setValueAtTime(gain * sustain, t0 + duration - release);
+    g.gain.linearRampToValueAtTime(0, t0 + duration);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  }
+
+  // Noise burst helper (for the wrong/buzz sound)
+  function noise({ duration = 0.12, gain = 0.06, filterFreq = 800, filterQ = 2 }) {
+    const c = ensureCtx();
+    if (!c) return;
+    const t0 = c.currentTime;
+    const bufferSize = Math.floor(c.sampleRate * duration);
+    const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+    const src = c.createBufferSource();
+    src.buffer = buffer;
+    const filter = c.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = filterFreq;
+    filter.Q.value = filterQ;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(gain, t0 + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(masterGain);
+    src.start(t0);
+    src.stop(t0 + duration);
+  }
+
+  return {
+    isEnabled: () => enabled,
+    setEnabled(v) {
+      enabled = v;
+      localStorage.setItem("sd_sound", v ? "1" : "0");
+      if (enabled && !ctx) ensureCtx();
+    },
+    getVolume: () => Math.round(volume * 100),
+    setVolume(pct) {
+      volume = Math.max(0, Math.min(100, pct)) / 100;
+      localStorage.setItem("sd_volume", String(Math.round(volume * 100)));
+      if (masterGain) masterGain.gain.value = volume;
+    },
+    // === Sound effects ===
+    tap() {
+      // Soft, very short click for cell selection / button taps.
+      // Throttle so dragging doesn't machine-gun the sound.
+      const now = Date.now();
+      if (now - lastTapAt < 35) return;
+      lastTapAt = now;
+      tone({ freq: 1400, type: "sine", duration: 0.04, attack: 0.001, decay: 0.01, sustain: 0.5, release: 0.03, gain: 0.06 });
+    },
+    select() {
+      // Slightly more present pop for cell selection
+      tone({ freq: 880, type: "sine", duration: 0.06, attack: 0.002, decay: 0.02, sustain: 0.5, release: 0.04, gain: 0.08 });
+    },
+    note() {
+      // Pencil-mark toggle: dry, low click
+      tone({ freq: 600, type: "triangle", duration: 0.05, attack: 0.001, decay: 0.02, sustain: 0.4, release: 0.03, gain: 0.07 });
+    },
+    erase() {
+      tone({ freq: 320, type: "triangle", duration: 0.1, attack: 0.002, decay: 0.04, sustain: 0.3, release: 0.05, gain: 0.08, freqEnd: 200 });
+    },
+    correct() {
+      // Quick rising two-note "ding" — satisfying lock-in
+      tone({ freq: 880, type: "sine", duration: 0.09, attack: 0.002, decay: 0.03, sustain: 0.7, release: 0.06, gain: 0.15 });
+      setTimeout(() => tone({ freq: 1320, type: "sine", duration: 0.18, attack: 0.002, decay: 0.05, sustain: 0.5, release: 0.1, gain: 0.14 }), 60);
+    },
+    wrong() {
+      // Low descending buzz + noise burst for "thud"
+      tone({ freq: 220, type: "sawtooth", duration: 0.22, attack: 0.005, decay: 0.06, sustain: 0.5, release: 0.12, gain: 0.12, freqEnd: 110 });
+      noise({ duration: 0.1, gain: 0.04, filterFreq: 600, filterQ: 1.5 });
+    },
+    hintSelf() {
+      // Gentle shimmer (3 quick rising sine notes) for using a hint
+      const c = ensureCtx();
+      if (!c) return;
+      const freqs = [880, 1175, 1568];
+      freqs.forEach((f, i) => {
+        setTimeout(() => tone({ freq: f, type: "sine", duration: 0.18, attack: 0.005, decay: 0.04, sustain: 0.5, release: 0.1, gain: 0.1 }), i * 55);
+      });
+    },
+    hintGift() {
+      // Different shimmer for receiving a free hint: brighter, more notes, alert quality
+      const c = ensureCtx();
+      if (!c) return;
+      const freqs = [1175, 1568, 1976, 2349];
+      freqs.forEach((f, i) => {
+        setTimeout(() => tone({ freq: f, type: "sine", duration: 0.2, attack: 0.005, decay: 0.04, sustain: 0.55, release: 0.12, gain: 0.11 }), i * 70);
+      });
+    },
+    victory() {
+      // Triumphant arpeggio: C-E-G-C major (523, 659, 784, 1047)
+      const freqs = [523, 659, 784, 1047];
+      freqs.forEach((f, i) => {
+        setTimeout(() => tone({ freq: f, type: "triangle", duration: 0.32, attack: 0.005, decay: 0.06, sustain: 0.7, release: 0.2, gain: 0.16 }), i * 110);
+      });
+      // Sparkle on top
+      setTimeout(() => tone({ freq: 2093, type: "sine", duration: 0.5, attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.3, gain: 0.1 }), 470);
+    },
+    boxComplete() {
+      // Quick three-note flourish, brighter than "correct" but not as long as "victory"
+      const freqs = [784, 988, 1319]; // G-B-E
+      freqs.forEach((f, i) => {
+        setTimeout(() => tone({ freq: f, type: "sine", duration: 0.16, attack: 0.003, decay: 0.04, sustain: 0.6, release: 0.1, gain: 0.13 }), i * 65);
+      });
+    },
+    defeat() {
+      // Soft descending tones
+      const freqs = [523, 440, 392, 330];
+      freqs.forEach((f, i) => {
+        setTimeout(() => tone({ freq: f, type: "triangle", duration: 0.28, attack: 0.005, decay: 0.06, sustain: 0.6, release: 0.15, gain: 0.13 }), i * 130);
+      });
+    },
+    start() {
+      // Two-note "ready, go" for game start
+      tone({ freq: 523, type: "triangle", duration: 0.15, attack: 0.005, decay: 0.04, sustain: 0.6, release: 0.08, gain: 0.13 });
+      setTimeout(() => tone({ freq: 784, type: "triangle", duration: 0.25, attack: 0.005, decay: 0.05, sustain: 0.6, release: 0.15, gain: 0.14 }), 130);
+    },
+    ready() {
+      // Soft confirm when you hit ready
+      tone({ freq: 660, type: "sine", duration: 0.1, attack: 0.003, decay: 0.03, sustain: 0.6, release: 0.06, gain: 0.1 });
+    },
+    join() {
+      // Pleasant ping when an opponent joins the lobby
+      tone({ freq: 988, type: "sine", duration: 0.15, attack: 0.005, decay: 0.04, sustain: 0.5, release: 0.1, gain: 0.11 });
+      setTimeout(() => tone({ freq: 1318, type: "sine", duration: 0.2, attack: 0.005, decay: 0.05, sustain: 0.5, release: 0.12, gain: 0.1 }), 80);
+    },
+    opponentClosing() {
+      // Two-note alert tone — descending, attention-grabbing but not alarming
+      tone({ freq: 740, type: "triangle", duration: 0.18, attack: 0.005, decay: 0.04, sustain: 0.6, release: 0.1, gain: 0.14 });
+      setTimeout(() => tone({ freq: 587, type: "triangle", duration: 0.28, attack: 0.005, decay: 0.05, sustain: 0.6, release: 0.18, gain: 0.13 }), 140);
+    }
+  };
+})();
+
+/* ============================================================
+   KEYBINDS — custom shortcuts for action buttons
+   ============================================================ */
+
+const Keybinds = (() => {
+  const DEFAULTS = {
+    erase: "Backspace",
+    notes: "n",
+    hint: "h"
+  };
+  // Keys reserved for built-in functions — can't be reassigned
+  const RESERVED = new Set([
+    "1","2","3","4","5","6","7","8","9","0",
+    "ArrowUp","ArrowDown","ArrowLeft","ArrowRight",
+    "Enter","Tab","Escape"
+  ]);
+
+  function load() {
+    try {
+      const raw = localStorage.getItem("sd_keybinds");
+      if (raw) return Object.assign({}, DEFAULTS, JSON.parse(raw));
+    } catch (e) {}
+    return { ...DEFAULTS };
+  }
+
+  let current = load();
+
+  function save() {
+    localStorage.setItem("sd_keybinds", JSON.stringify(current));
+  }
+
+  return {
+    get(action) { return current[action]; },
+    getAll() { return { ...current }; },
+    isReserved(key) { return RESERVED.has(key); },
+    set(action, key) {
+      // If another action already has this key, swap them
+      for (const other of Object.keys(current)) {
+        if (other !== action && current[other].toLowerCase() === key.toLowerCase()) {
+          current[other] = current[action]; // give that action our old key
+        }
+      }
+      current[action] = key;
+      save();
+    },
+    reset() {
+      current = { ...DEFAULTS };
+      save();
+    },
+    // Given a keypress, return which action (if any) it triggers
+    lookup(keyPressed) {
+      for (const action of Object.keys(current)) {
+        const bound = current[action];
+        if (bound.toLowerCase() === keyPressed.toLowerCase()) return action;
+      }
+      return null;
+    },
+    // Format a key for display (e.g. "n" -> "N", "Backspace" -> "Backspace")
+    display(key) {
+      if (!key) return "—";
+      if (key.length === 1) return key.toUpperCase();
+      return key;
+    }
+  };
+})();
+
+/* ============================================================
+   INIT
+   ============================================================ */
+
+function init() {
+  if (window.__dlog) window.__dlog('init() running — binding event handlers');
+  // Restore player name
+  const savedName = localStorage.getItem("sd_name");
+  if (savedName) {
+    $("#player-name").value = savedName;
+    State.playerName = savedName;
+  }
+
+  bindHomeEvents();
+  bindJoinEvents();
+  bindLobbyEvents();
+  bindGameEvents();
+  bindModalEvents();
+  bindSoundToggle();
+  bindRivalryEvents();
+  bindSettingsEvents();
+  updateSoundToggleIcon();
+
+  // Try to restore the last rivalry so the score appears immediately on home
+  restoreLastRivalry();
+
+  if (window.__dlog) window.__dlog('All handlers bound. Ready for clicks.');
+
+  if (!CONFIGURED) {
+    toast("⚠ Firebase not configured — see README", 6000);
+  }
+}
+
+function bindSoundToggle() {
+  $("#btn-sound-toggle").addEventListener("click", () => {
+    Sound.setEnabled(!Sound.isEnabled());
+    updateSoundToggleIcon();
+    if (Sound.isEnabled()) Sound.tap();
+    toast(Sound.isEnabled() ? "Sound on" : "Sound off");
+  });
+}
+
+function bindRivalryEvents() {
+  $("#btn-show-history").addEventListener("click", () => {
+    const div = $("#rivalry-history");
+    const showing = div.style.display !== "none";
+    div.style.display = showing ? "none" : "block";
+    $("#btn-show-history").textContent = showing ? "Past months" : "Hide history";
+    if (!showing) renderHistory();
+  });
+  $("#btn-request-reset").addEventListener("click", () => requestResetWithConfirm("alltime"));
+  $("#btn-request-reset-month").addEventListener("click", () => requestResetWithConfirm("month"));
+  $("#btn-reset-confirm").addEventListener("click", confirmReset);
+  $("#btn-reset-cancel").addEventListener("click", cancelReset);
+}
+
+function requestResetWithConfirm(scope) {
+  if (!RivalryState.key) {
+    toast("Play a duel first to set up your rivalry");
+    return;
+  }
+  if (RivalryState.data && RivalryState.data.resetRequest) {
+    toast("A reset is already pending");
+    return;
+  }
+  const label = scope === "month" ? "this month's score" : "the all-time score";
+  if (confirm(`Send a request to ${RivalryState.oppName} to reset ${label}? They'll need to confirm before it wipes.`)) {
+    requestReset(scope);
+  }
+}
+
+/* ============================================================
+   SETTINGS SCREEN — keybinds
+   ============================================================ */
+
+function bindSettingsEvents() {
+  $("#btn-open-settings").addEventListener("click", () => {
+    renderKeybindRows();
+    renderSoundSettings();
+    showScreen("screen-settings");
+  });
+  $("#btn-settings-back").addEventListener("click", () => {
+    showScreen("screen-home");
+  });
+  $$(".keybind-btn").forEach(btn => {
+    btn.addEventListener("click", () => beginKeybindCapture(btn.dataset.action));
+  });
+  $("#btn-reset-keybinds").addEventListener("click", () => {
+    Keybinds.reset();
+    renderKeybindRows();
+    toast("Shortcuts reset to defaults");
+  });
+  $("#btn-keybind-cancel").addEventListener("click", endKeybindCapture);
+
+  $("#sound-enabled-toggle").addEventListener("change", (e) => {
+    Sound.setEnabled(e.target.checked);
+    updateSoundToggleIcon();
+    updateVolumeRowState();
+    if (e.target.checked) Sound.tap();
+  });
+  $("#sound-volume-slider").addEventListener("input", (e) => {
+    const v = parseInt(e.target.value, 10);
+    $("#sound-volume-value").textContent = v;
+    Sound.setVolume(v);
+  });
+  // Play a preview sound when slider released, so users can hear their setting
+  $("#sound-volume-slider").addEventListener("change", () => Sound.select());
+}
+
+function renderSoundSettings() {
+  $("#sound-enabled-toggle").checked = Sound.isEnabled();
+  $("#sound-volume-slider").value = Sound.getVolume();
+  $("#sound-volume-value").textContent = Sound.getVolume();
+  updateVolumeRowState();
+}
+
+function updateVolumeRowState() {
+  const on = Sound.isEnabled();
+  $("#volume-row").style.opacity = on ? "1" : "0.4";
+  $("#sound-volume-slider").disabled = !on;
+}
+
+function renderKeybindRows() {
+  const all = Keybinds.getAll();
+  $("#key-erase").textContent = Keybinds.display(all.erase);
+  $("#key-notes").textContent = Keybinds.display(all.notes);
+  $("#key-hint").textContent = Keybinds.display(all.hint);
+}
+
+let _captureAction = null;
+let _captureHandler = null;
+
+function beginKeybindCapture(action) {
+  _captureAction = action;
+  const label = action === "erase" ? "Erase" : action === "notes" ? "Toggle notes" : "Hint";
+  $("#keybind-modal-action").textContent = label;
+  $("#keybind-modal-title").textContent = "Press a key…";
+  $("#keybind-modal-backdrop").classList.add("active");
+
+  _captureHandler = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Escape cancels
+    if (e.key === "Escape") { endKeybindCapture(); return; }
+
+    if (Keybinds.isReserved(e.key)) {
+      $("#keybind-modal-title").textContent = "That key is reserved";
+      $("#keybind-modal-title").style.color = "var(--error)";
+      setTimeout(() => {
+        $("#keybind-modal-title").textContent = "Press a key…";
+        $("#keybind-modal-title").style.color = "";
+      }, 1100);
+      return;
+    }
+    // Skip modifier-only events (Shift, Ctrl, etc on their own)
+    if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") return;
+
+    // Accept the key
+    Keybinds.set(_captureAction, e.key);
+    renderKeybindRows();
+    endKeybindCapture();
+    toast(`Bound to ${Keybinds.display(e.key)}`);
+  };
+  window.addEventListener("keydown", _captureHandler, true);
+}
+
+function endKeybindCapture() {
+  $("#keybind-modal-backdrop").classList.remove("active");
+  if (_captureHandler) {
+    window.removeEventListener("keydown", _captureHandler, true);
+    _captureHandler = null;
+  }
+  _captureAction = null;
+}
+
+function updateSoundToggleIcon() {
+  const on = Sound.isEnabled();
+  $("#icon-sound-on").style.display = on ? "" : "none";
+  $("#icon-sound-off").style.display = on ? "none" : "";
+  $("#btn-sound-toggle").classList.toggle("muted", !on);
+}
+
+/* ============================================================
+   HOME EVENTS
+   ============================================================ */
+
+function bindHomeEvents() {
+  $("#btn-create").addEventListener("click", onCreateRoom);
+  $("#btn-join-open").addEventListener("click", () => {
+    if (!validateName()) return;
+    showScreen("screen-join");
+    $("#join-code").value = "";
+    $("#join-error").style.display = "none";
+    setTimeout(() => $("#join-code").focus(), 100);
+  });
+  $("#player-name").addEventListener("input", (e) => {
+    localStorage.setItem("sd_name", e.target.value.trim());
+  });
+}
+
+function validateName() {
+  const n = $("#player-name").value.trim();
+  if (!n) {
+    toast("Enter your name first");
+    $("#player-name").focus();
+    return false;
+  }
+  State.playerName = n.slice(0, 20);
+  localStorage.setItem("sd_name", State.playerName);
+  return true;
+}
+
+/* ============================================================
+   RIVALRY / SHARED TALLY
+   ============================================================
+   Stored in Firebase at rivalries/{key} where key is derived
+   from the sorted pair of names. Both players land on the same
+   record because both compute the same key.
+
+   Schema:
+     rivalries/{key} = {
+       names: [string, string]    // canonical sorted name pair
+       alltime: { [name]: number }  // win count per name
+       currentMonth: "2026-05"
+       monthWins: { [name]: number }
+       history: { "2026-04": { [name]: number, winner: string }, ... }
+       resetRequest: { from: name, at: timestamp } | null
+     }
+*/
+
+let RivalryState = {
+  key: null,
+  data: null,
+  unsubscribe: null,
+  myName: null,
+  oppName: null,  // latest known opponent (we only know after a duel)
+  ackedResetRequest: null  // skip showing the same reset prompt twice in a session
+};
+
+function normalizeName(name) {
+  return (name || "").trim().toLowerCase();
+}
+
+function rivalryKey(name1, name2) {
+  // Sort alphabetically so both players compute the same key
+  const a = normalizeName(name1);
+  const b = normalizeName(name2);
+  if (!a || !b) return null;
+  const pair = [a, b].sort();
+  // FNV-1a hash then base36 — short, alphanumeric, no special chars (safe for Firebase paths)
+  let h = 2166136261 >>> 0;
+  const s = pair.join("|");
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h.toString(36);
+}
+
+function currentMonthString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(monthStr) {
+  // "2026-05" -> "May 2026"
+  if (!monthStr) return "";
+  const [y, m] = monthStr.split("-").map(Number);
+  const date = new Date(y, m - 1, 1);
+  return date.toLocaleString(undefined, { month: "long", year: "numeric" });
+}
+
+async function attachRivalry(myName, oppName) {
+  // Called whenever we know both names (after joining/creating a duel where the opponent has appeared)
+  const key = rivalryKey(myName, oppName);
+  if (!key) return;
+  if (RivalryState.key === key) {
+    // Already attached
+    return;
+  }
+  // Detach previous
+  if (RivalryState.unsubscribe) { RivalryState.unsubscribe(); RivalryState.unsubscribe = null; }
+  RivalryState.key = key;
+  RivalryState.myName = myName;
+  RivalryState.oppName = oppName;
+  RivalryState.ackedResetRequest = null;
+
+  // Save the rivalry key locally so the home screen can render it on next load
+  // (even before the opponent shows up, by remembering who we last played)
+  localStorage.setItem("sd_last_rivalry", JSON.stringify({ key, myName, oppName }));
+
+  if (!CONFIGURED) return;
+
+  const ref = FB.ref(DB, `rivalries/${key}`);
+  // Seed it if missing
+  const snap = await FB.get(ref);
+  if (!snap.exists()) {
+    const sortedNames = [normalizeName(myName), normalizeName(oppName)].sort();
+    await FB.set(ref, {
+      names: sortedNames,
+      alltime: { [sortedNames[0]]: 0, [sortedNames[1]]: 0 },
+      currentMonth: currentMonthString(),
+      monthWins: { [sortedNames[0]]: 0, [sortedNames[1]]: 0 },
+      history: {},
+      resetRequest: null
+    });
+  } else {
+    // If the month has rolled over since last update, archive and reset
+    await maybeRolloverMonth(snap.val(), key);
+  }
+
+  const cb = FB.onValue(ref, (s) => {
+    if (!s.exists()) return;
+    RivalryState.data = s.val();
+    renderRivalry();
+  });
+  RivalryState.unsubscribe = () => FB.off(ref, "value", cb);
+}
+
+async function maybeRolloverMonth(data, key) {
+  if (!data) return;
+  const now = currentMonthString();
+  if (data.currentMonth && data.currentMonth !== now) {
+    // Archive the finished month
+    const prev = data.currentMonth;
+    const monthWins = data.monthWins || {};
+    const names = data.names || [];
+    let winner = null;
+    if (names.length === 2) {
+      const w0 = monthWins[names[0]] || 0;
+      const w1 = monthWins[names[1]] || 0;
+      if (w0 > w1) winner = names[0];
+      else if (w1 > w0) winner = names[1];
+      else winner = "tie";
+    }
+    const historyEntry = { ...monthWins, winner };
+    const updates = {};
+    updates[`rivalries/${key}/history/${prev}`] = historyEntry;
+    updates[`rivalries/${key}/currentMonth`] = now;
+    const freshMonth = {};
+    (names || []).forEach(n => { freshMonth[n] = 0; });
+    updates[`rivalries/${key}/monthWins`] = freshMonth;
+    await FB.update(FB.ref(DB), updates);
+  }
+}
+
+async function recordResult(didWin, opponentName) {
+  // Make sure we're attached to the right rivalry
+  await attachRivalry(State.playerName, opponentName);
+  if (!CONFIGURED || !RivalryState.key) return;
+  const key = RivalryState.key;
+  const winnerName = normalizeName(didWin ? State.playerName : opponentName);
+
+  // Use a transaction so both players can record simultaneously without losing increments
+  await FB.runTransaction(FB.ref(DB, `rivalries/${key}`), (current) => {
+    if (!current) {
+      // Seed if somehow missing
+      const names = [normalizeName(State.playerName), normalizeName(opponentName)].sort();
+      const at = { [names[0]]: 0, [names[1]]: 0 };
+      const mo = { [names[0]]: 0, [names[1]]: 0 };
+      at[winnerName] = 1;
+      mo[winnerName] = 1;
+      return {
+        names,
+        alltime: at,
+        currentMonth: currentMonthString(),
+        monthWins: mo,
+        history: {},
+        resetRequest: null
+      };
+    }
+    // Handle rollover inside transaction too
+    if (current.currentMonth !== currentMonthString()) {
+      const prev = current.currentMonth;
+      const names = current.names || [];
+      const mw = current.monthWins || {};
+      let win = null;
+      if (names.length === 2) {
+        const w0 = mw[names[0]] || 0;
+        const w1 = mw[names[1]] || 0;
+        win = w0 > w1 ? names[0] : w1 > w0 ? names[1] : "tie";
+      }
+      current.history = current.history || {};
+      current.history[prev] = { ...mw, winner: win };
+      current.currentMonth = currentMonthString();
+      current.monthWins = {};
+      (names || []).forEach(n => { current.monthWins[n] = 0; });
+    }
+    current.alltime = current.alltime || {};
+    current.monthWins = current.monthWins || {};
+    current.alltime[winnerName] = (current.alltime[winnerName] || 0) + 1;
+    current.monthWins[winnerName] = (current.monthWins[winnerName] || 0) + 1;
+    return current;
+  });
+}
+
+function renderRivalry() {
+  const card = $("#rivalry-card");
+  if (!RivalryState.data || !RivalryState.myName || !RivalryState.oppName) {
+    // Fall back: if we have a saved last rivalry, show whatever's loaded
+    card.style.display = "none";
+    return;
+  }
+  const d = RivalryState.data;
+  const myNorm = normalizeName(RivalryState.myName);
+  const oppNorm = normalizeName(RivalryState.oppName);
+
+  card.style.display = "block";
+  $("#rivalry-name-1").textContent = RivalryState.myName;
+  $("#rivalry-name-2").textContent = RivalryState.oppName;
+
+  // All-time
+  const at = d.alltime || {};
+  const myAll = at[myNorm] || 0;
+  const oppAll = at[oppNorm] || 0;
+  $("#alltime-wins").textContent = myAll;
+  $("#alltime-losses").textContent = oppAll;
+
+  // Month
+  const mw = d.monthWins || {};
+  const myMonth = mw[myNorm] || 0;
+  const oppMonth = mw[oppNorm] || 0;
+  $("#month-wins").textContent = myMonth;
+  $("#month-losses").textContent = oppMonth;
+  $("#month-label").textContent = monthLabel(d.currentMonth);
+
+  // Last month winner footnote
+  const history = d.history || {};
+  const monthsSorted = Object.keys(history).sort();
+  if (monthsSorted.length > 0) {
+    const lastKey = monthsSorted[monthsSorted.length - 1];
+    const lastEntry = history[lastKey];
+    const w = lastEntry.winner;
+    let txt;
+    if (!w || w === "tie") {
+      txt = `${monthLabel(lastKey)} was a tie`;
+    } else {
+      // capitalise: w is normalized (lowercase). Find original capitalisation
+      const displayName = (w === myNorm) ? RivalryState.myName : RivalryState.oppName;
+      txt = `${monthLabel(lastKey)} winner: ${displayName} ✓`;
+    }
+    $("#last-month-line").textContent = txt;
+    $("#last-month-line").style.display = "block";
+  } else {
+    $("#last-month-line").style.display = "none";
+  }
+
+  // Render history list (if currently expanded)
+  renderHistory();
+
+  // Reset request handling
+  renderResetUI();
+}
+
+function renderHistory() {
+  const div = $("#rivalry-history");
+  if (div.style.display === "none" || !RivalryState.data) return;
+
+  const history = RivalryState.data.history || {};
+  const monthsSorted = Object.keys(history).sort().reverse();
+
+  div.innerHTML = "<h4>Past months</h4>";
+  if (monthsSorted.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "history-empty";
+    empty.textContent = "No completed months yet.";
+    div.appendChild(empty);
+    return;
+  }
+  const myNorm = normalizeName(RivalryState.myName);
+  const oppNorm = normalizeName(RivalryState.oppName);
+  for (const m of monthsSorted) {
+    const entry = history[m];
+    const myWins = entry[myNorm] || 0;
+    const oppWins = entry[oppNorm] || 0;
+    const row = document.createElement("div");
+    row.className = "history-row";
+    let winnerLabel = "";
+    if (entry.winner === "tie") winnerLabel = "<span class='month-winner'>tie</span>";
+    else if (entry.winner === myNorm) winnerLabel = `<span class='month-winner'>${escapeHTML(RivalryState.myName)} won</span>`;
+    else if (entry.winner === oppNorm) winnerLabel = `<span class='month-winner'>${escapeHTML(RivalryState.oppName)} won</span>`;
+    row.innerHTML = `
+      <span class="month-name">${monthLabel(m)}</span>
+      <span><span class="month-result">${myWins} — ${oppWins}</span>${winnerLabel}</span>
+    `;
+    div.appendChild(row);
+  }
+}
+
+function renderResetUI() {
+  const pendingDiv = $("#reset-pending");
+  const req = RivalryState.data && RivalryState.data.resetRequest;
+  if (!req) {
+    pendingDiv.style.display = "none";
+    return;
+  }
+  const scope = req.scope || "alltime";
+  const scopeLabel = scope === "month" ? "this month's score" : "the all-time score";
+
+  // Source of truth for "am I the requester": compare to State.playerName (what the user actually typed)
+  // rather than RivalryState.myName, which can be stale if the rivalry was attached incorrectly.
+  const myCurrentName = State.playerName || RivalryState.myName || "";
+  const fromMe = !!req.from && normalizeName(req.from) === normalizeName(myCurrentName);
+
+  pendingDiv.style.display = "block";
+  if (fromMe) {
+    const partnerDisplay = RivalryState.oppName || "your opponent";
+    $("#reset-prompt-text").textContent = `Waiting for ${partnerDisplay} to confirm the reset…`;
+    $("#btn-reset-confirm").style.display = "none";
+    $("#btn-reset-cancel").textContent = "Cancel request";
+  } else {
+    const requesterDisplay = req.from || "Your opponent";
+    $("#reset-prompt-text").textContent = `${requesterDisplay} wants to reset ${scopeLabel}. Confirm?`;
+    $("#btn-reset-confirm").style.display = "";
+    $("#btn-reset-cancel").textContent = "Decline";
+  }
+}
+
+async function requestReset(scope = "alltime") {
+  if (!RivalryState.key || !CONFIGURED) return;
+  const myName = State.playerName || RivalryState.myName;
+  if (!myName) {
+    toast("Couldn't identify you — try again");
+    return;
+  }
+  await FB.update(FB.ref(DB, `rivalries/${RivalryState.key}`), {
+    resetRequest: {
+      from: myName,
+      scope,
+      at: Date.now()
+    }
+  });
+  const label = scope === "month" ? "month" : "all-time";
+  toast(`${label.charAt(0).toUpperCase() + label.slice(1)} reset requested. Waiting for ${RivalryState.oppName || "your opponent"}…`, 2600);
+}
+
+async function confirmReset() {
+  if (!RivalryState.key || !CONFIGURED) return;
+  const req = RivalryState.data && RivalryState.data.resetRequest;
+  const scope = (req && req.scope) || "alltime";
+  const names = RivalryState.data.names || [];
+  const fresh = {};
+  names.forEach(n => { fresh[n] = 0; });
+  const updates = { resetRequest: null };
+  if (scope === "month") {
+    updates.monthWins = fresh;
+  } else {
+    updates.alltime = fresh;
+  }
+  await FB.update(FB.ref(DB, `rivalries/${RivalryState.key}`), updates);
+  toast(scope === "month" ? "This month's score reset" : "All-time score reset");
+}
+
+async function cancelReset() {
+  if (!RivalryState.key || !CONFIGURED) return;
+  await FB.update(FB.ref(DB, `rivalries/${RivalryState.key}`), {
+    resetRequest: null
+  });
+}
+
+// On app load, try to restore the last rivalry so the score shows immediately
+async function restoreLastRivalry() {
+  const raw = localStorage.getItem("sd_last_rivalry");
+  if (!raw) return;
+  try {
+    const { myName, oppName } = JSON.parse(raw);
+    if (myName && oppName) {
+      // Only restore if the current player name still matches
+      if (normalizeName(myName) === normalizeName(State.playerName || $("#player-name").value)) {
+        await attachRivalry(myName, oppName);
+      }
+    }
+  } catch (e) {}
+}
+
+/* ============================================================
+   ROOM CREATION
+   ============================================================ */
+
+async function onCreateRoom() {
+  if (window.__dlog) window.__dlog('onCreateRoom clicked');
+  if (!validateName()) {
+    if (window.__dlog) window.__dlog('validateName failed (empty name?)', true);
+    return;
+  }
+  if (window.__dlog) window.__dlog('Name validated: ' + State.playerName);
+  if (!CONFIGURED) {
+    if (window.__dlog) window.__dlog('Not CONFIGURED — bailing out', true);
+    toast("Firebase isn't configured yet");
+    return;
+  }
+
+  try {
+    if (window.__dlog) window.__dlog('Attempting to create room…');
+    // Try a few codes until we find a free one
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const code = randomCode(4);
+      if (window.__dlog) window.__dlog('Trying code: ' + code);
+      const roomRef = FB.ref(DB, `rooms/${code}`);
+      const snap = await FB.get(roomRef);
+      if (snap.exists() && snap.val().status !== "ended") {
+        if (window.__dlog) window.__dlog('Code in use, trying again');
+        continue;
+      }
+
+      const room = {
+        code,
+        status: "lobby",
+        createdAt: Date.now(),
+        settings: {
+          clues: 36,
+          difficulty: "medium",
+          mistakeLimit: 3,
+          hintsPerDuel: 3
+        },
+        players: {
+          [State.playerId]: {
+            name: State.playerName,
+            ready: false,
+            joinedAt: Date.now(),
+            isCreator: true
+          }
+        }
+      };
+      if (window.__dlog) window.__dlog('Writing room ' + code + ' to database…');
+      await FB.set(roomRef, room);
+      if (window.__dlog) window.__dlog('Room ' + code + ' written! Switching to lobby.');
+      State.roomCode = code;
+      State.isCreator = true;
+      attachRoom(code);
+      return;
+    }
+    toast("Couldn't create a room — try again");
+  } catch (e) {
+    console.error("Create room failed", e);
+    if (window.__dlog) window.__dlog('Create room threw: ' + (e.message || e.code || e), true);
+    toast("Error: " + (e.message || e.code || "unknown — see README troubleshooting"), 6000);
+  }
+}
+
+/* ============================================================
+   JOIN
+   ============================================================ */
+
+function bindJoinEvents() {
+  $("#btn-join-back").addEventListener("click", () => showScreen("screen-home"));
+  $("#join-code").addEventListener("input", (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  });
+  $("#btn-join-confirm").addEventListener("click", onJoinConfirm);
+  $("#join-code").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") onJoinConfirm();
+  });
+}
+
+async function onJoinConfirm() {
+  const code = $("#join-code").value.trim().toUpperCase();
+  $("#join-error").style.display = "none";
+  if (code.length !== 4) {
+    $("#join-error").textContent = "Codes are 4 letters.";
+    $("#join-error").style.display = "block";
+    return;
+  }
+  if (!CONFIGURED) {
+    toast("Firebase isn't configured yet");
+    return;
+  }
+
+  const roomRef = FB.ref(DB, `rooms/${code}`);
+  const snap = await FB.get(roomRef);
+  if (!snap.exists()) {
+    $("#join-error").textContent = "No room with that code.";
+    $("#join-error").style.display = "block";
+    return;
+  }
+  const room = snap.val();
+  if (room.status === "ended") {
+    $("#join-error").textContent = "That duel has already ended.";
+    $("#join-error").style.display = "block";
+    return;
+  }
+
+  const playerCount = Object.keys(room.players || {}).length;
+  const alreadyIn = room.players && room.players[State.playerId];
+  if (!alreadyIn && playerCount >= 2) {
+    $("#join-error").textContent = "Room is full.";
+    $("#join-error").style.display = "block";
+    return;
+  }
+
+  // Add ourselves
+  await FB.update(FB.ref(DB, `rooms/${code}/players/${State.playerId}`), {
+    name: State.playerName,
+    ready: false,
+    joinedAt: Date.now(),
+    isCreator: false
+  });
+
+  State.roomCode = code;
+  State.isCreator = false;
+  attachRoom(code);
+}
+
+/* ============================================================
+   LOBBY — listen to room, render state
+   ============================================================ */
+
+function attachRoom(code) {
+  showScreen("screen-lobby");
+  $("#lobby-code").textContent = code;
+  $("#game-room-code").textContent = code;
+
+  // Listen to room changes
+  const roomRef = FB.ref(DB, `rooms/${code}`);
+  if (State.unsubRoom) State.unsubRoom();
+  const cb = FB.onValue(roomRef, (snap) => {
+    if (!snap.exists()) {
+      toast("Room was closed");
+      leaveRoom();
+      return;
+    }
+    State.room = snap.val();
+    onRoomUpdate(State.room);
+  });
+  State.unsubRoom = () => FB.off(roomRef, "value", cb);
+
+  // Set up disconnect cleanup:
+  // 1) Remove our player record (so the lobby clears the slot)
+  // 2) Write a forfeit so the opponent's room update detects it and gets the win
+  // We track the handles so we can CANCEL them when the game ends cleanly
+  // (otherwise a clean win followed by closing the tab would overwrite our "won" status).
+  State._disconnectPlayerRef = FB.ref(DB, `rooms/${code}/players/${State.playerId}`);
+  State._disconnectFinishRef = FB.ref(DB, `rooms/${code}/game/finished/${State.playerId}`);
+  FB.onDisconnect(State._disconnectPlayerRef).remove();
+  FB.onDisconnect(State._disconnectFinishRef).set({
+    status: "forfeit",
+    time: 0,
+    mistakes: 0,
+    at: { ".sv": "timestamp" }
+  });
+}
+
+function cancelDisconnectHandlers() {
+  // Cancel queued onDisconnect operations so a clean exit doesn't accidentally
+  // get marked as a forfeit. Safe to call multiple times.
+  try {
+    if (State._disconnectPlayerRef) FB.onDisconnect(State._disconnectPlayerRef).cancel();
+    if (State._disconnectFinishRef) FB.onDisconnect(State._disconnectFinishRef).cancel();
+  } catch (e) { /* not fatal */ }
+  State._disconnectPlayerRef = null;
+  State._disconnectFinishRef = null;
+}
+
+function bindLobbyEvents() {
+  $("#btn-leave-lobby").addEventListener("click", leaveRoom);
+
+  $("#lobby-code").addEventListener("click", () => {
+    const code = $("#lobby-code").textContent;
+    navigator.clipboard.writeText(code).then(
+      () => toast("Code copied ✓"),
+      () => toast("Couldn't copy — share manually")
+    );
+  });
+
+  $$(".diff-btn[data-diff]").forEach(b => {
+    b.addEventListener("click", () => {
+      if (!State.room || State.room.status !== "lobby") return;
+      const diff = b.dataset.diff;
+      const clues = diffToClues(diff);
+      updateSettings({ difficulty: diff, clues });
+    });
+  });
+
+  $("#clues-slider").addEventListener("input", (e) => {
+    if (!State.room || State.room.status !== "lobby") return;
+    const clues = parseInt(e.target.value, 10);
+    const diff = cluesToDifficulty(clues);
+    $("#clues-value").textContent = clues;
+    // Debounce a touch so we don't spam the DB
+    clearTimeout(window.__sliderTm);
+    window.__sliderTm = setTimeout(() => {
+      updateSettings({ clues, difficulty: diff });
+    }, 120);
+  });
+
+  $("#mistakes-slider").addEventListener("input", (e) => {
+    if (!State.room || State.room.status !== "lobby") return;
+    const ml = parseInt(e.target.value, 10);
+    $("#mistakes-value").textContent = ml === 0 ? "Off" : ml;
+    $("#mistakes-label").textContent = ml === 0 ? "no limit" : (ml === 1 ? "mistake" : "mistakes");
+    clearTimeout(window.__mistakesTm);
+    window.__mistakesTm = setTimeout(() => {
+      updateSettings({ mistakeLimit: ml });
+    }, 120);
+  });
+
+  $("#hints-slider").addEventListener("input", (e) => {
+    if (!State.room || State.room.status !== "lobby") return;
+    const h = parseInt(e.target.value, 10);
+    $("#hints-value").textContent = h === 0 ? "Off" : h;
+    $("#hints-label").textContent = h === 0 ? "no hints" : (h === 1 ? "hint" : "hints");
+    clearTimeout(window.__hintsTm);
+    window.__hintsTm = setTimeout(() => {
+      updateSettings({ hintsPerDuel: h });
+    }, 120);
+  });
+
+  $("#btn-ready").addEventListener("click", onToggleReady);
+}
+
+function diffToClues(diff) {
+  return { easy: 42, medium: 34, hard: 28, expert: 24 }[diff] || 34;
+}
+function cluesToDifficulty(c) {
+  if (c >= 40) return "easy";
+  if (c >= 32) return "medium";
+  if (c >= 26) return "hard";
+  return "expert";
+}
+
+async function updateSettings(patch) {
+  // Any unready state should be cleared when settings change, so people don't accidentally start with wrong settings
+  const merged = Object.assign({}, State.room.settings, patch);
+  const updates = {};
+  updates[`rooms/${State.roomCode}/settings`] = merged;
+  if (State.room && State.room.players) {
+    Object.keys(State.room.players).forEach(pid => {
+      updates[`rooms/${State.roomCode}/players/${pid}/ready`] = false;
+    });
+  }
+  await FB.update(FB.ref(DB), updates);
+}
+
+async function onToggleReady() {
+  if (!State.room) return;
+  const me = State.room.players[State.playerId];
+  if (!me) return;
+  const newReady = !me.ready;
+  Sound.ready();
+  await FB.update(FB.ref(DB, `rooms/${State.roomCode}/players/${State.playerId}`), {
+    ready: newReady
+  });
+}
+
+function onRoomUpdate(room) {
+  if (room.status === "lobby") {
+    if ($("#screen-game").classList.contains("active")) {
+      // shouldn't happen but defensive
+    }
+    renderLobby(room);
+  } else if (room.status === "playing") {
+    if (!$("#screen-game").classList.contains("active")) {
+      startGameFromRoom(room);
+    } else {
+      renderOpponentsStrip(room);
+      maybeEndOnOpponentFinish(room);
+    }
+  } else if (room.status === "ended") {
+    // handled inside the game flow
+  }
+}
+
+function renderLobby(room) {
+  // Players row
+  const row = $("#players-row");
+  row.innerHTML = "";
+  const playerIds = Object.keys(room.players || {});
+
+  // Detect opponent joined (compared to last render)
+  const oppCount = playerIds.filter(id => id !== State.playerId).length;
+  if (State._lastOppCount == null) State._lastOppCount = 0;
+  if (oppCount > State._lastOppCount) {
+    Sound.join();
+    // Now that we know the opponent, attach the rivalry record so the score loads
+    const oppPid = playerIds.find(id => id !== State.playerId);
+    const oppName = oppPid && room.players[oppPid] && room.players[oppPid].name;
+    if (oppName && State.playerName) attachRivalry(State.playerName, oppName);
+  }
+  State._lastOppCount = oppCount;
+
+  // Always show our card first
+  const ordered = [State.playerId, ...playerIds.filter(id => id !== State.playerId)];
+
+  for (const pid of ordered) {
+    const p = room.players[pid];
+    if (!p) continue;
+    const isMe = pid === State.playerId;
+    const card = document.createElement("div");
+    card.className = "player-card" + (p.ready ? " ready" : "");
+    card.innerHTML = `
+      ${isMe ? '<div class="you-tag">YOU</div>' : ''}
+      <div class="name">${escapeHTML(p.name || "Anonymous")}</div>
+      <div class="status">${p.ready ? "Ready ✓" : "Not ready"}</div>
+    `;
+    row.appendChild(card);
+  }
+  if (playerIds.length < 2) {
+    const empty = document.createElement("div");
+    empty.className = "player-card empty-slot";
+    empty.innerHTML = "Waiting for opponent <span class='waiting-dot'></span><span class='waiting-dot'></span><span class='waiting-dot'></span>";
+    row.appendChild(empty);
+  }
+
+  // Settings
+  $$(".diff-btn[data-diff]").forEach(b => {
+    b.classList.toggle("active", b.dataset.diff === room.settings.difficulty);
+  });
+  $("#clues-slider").value = room.settings.clues;
+  $("#clues-value").textContent = room.settings.clues;
+
+  const ml = room.settings.mistakeLimit ?? 3;
+  $("#mistakes-slider").value = ml;
+  $("#mistakes-value").textContent = ml === 0 ? "Off" : ml;
+  $("#mistakes-label").textContent = ml === 0 ? "no limit" : (ml === 1 ? "mistake" : "mistakes");
+
+  const hintsSetting = room.settings.hintsPerDuel ?? 3;
+  $("#hints-slider").value = hintsSetting;
+  $("#hints-value").textContent = hintsSetting === 0 ? "Off" : hintsSetting;
+  $("#hints-label").textContent = hintsSetting === 0 ? "no hints" : (hintsSetting === 1 ? "hint" : "hints");
+
+  // Ready button
+  const me = room.players[State.playerId];
+  const readyBtn = $("#btn-ready");
+  if (me && me.ready) {
+    readyBtn.textContent = "Cancel ready";
+    readyBtn.classList.remove("btn-accent");
+    readyBtn.classList.add("btn-secondary");
+  } else {
+    readyBtn.textContent = "I'm ready";
+    readyBtn.classList.add("btn-accent");
+    readyBtn.classList.remove("btn-secondary");
+  }
+
+  // Ready hint
+  const allReady = playerIds.length === 2 && playerIds.every(pid => room.players[pid].ready);
+  if (playerIds.length < 2) {
+    $("#ready-hint").textContent = "Share the code with your opponent.";
+  } else if (allReady) {
+    $("#ready-hint").textContent = "Both ready! Starting…";
+  } else {
+    $("#ready-hint").textContent = "Both players must hit ready to begin.";
+  }
+
+  // Auto-start when both ready — only the creator triggers, to avoid double-writes
+  if (allReady && State.isCreator && !room.game) {
+    startDuel(room);
+  }
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
+
+/* ============================================================
+   START THE DUEL
+   ============================================================ */
+
+async function startDuel(room) {
+  // Generate puzzle seeded on the room code + a per-game salt
+  const playerIds = Object.keys(room.players);
+  const gameSeed = room.code + "_" + Date.now();
+  const initialHints = room.settings.hintsPerDuel ?? 0;
+  const game = {
+    seed: gameSeed,
+    clues: room.settings.clues,
+    mistakeLimit: room.settings.mistakeLimit,
+    hintsPerDuel: initialHints,
+    startedAt: Date.now(),
+    progress: {},
+    finished: {},
+    hints: {}
+  };
+  playerIds.forEach(pid => {
+    game.progress[pid] = { filled: 0, mistakes: 0, time: 0 };
+    // remainingOwn: hints from your initial allotment
+    // remainingGifted: bonus hints from opponent's spending — using these does NOT gift back
+    // usedOwn / usedGifted: tracking for end-game display
+    game.hints[pid] = {
+      remainingOwn: initialHints,
+      remainingGifted: 0,
+      usedOwn: 0,
+      usedGifted: 0
+    };
+  });
+  await FB.update(FB.ref(DB, `rooms/${room.code}`), {
+    status: "playing",
+    game
+  });
+}
+
+function startGameFromRoom(room) {
+  const { puzzle, solution } = makePuzzle(room.game.seed, room.game.clues);
+  State.cells = puzzle.map((row, r) => row.map((v, c) => ({
+    value: v,
+    given: v !== 0,
+    locked: v !== 0,
+    notes: new Set()
+  })));
+  State.solution = solution;
+  State.selected = null;
+  State.notesMode = false;
+  State.mistakes = 0;
+  const myHints = (room.game.hints && room.game.hints[State.playerId]) || {};
+  State.hintsRemainingOwn = myHints.remainingOwn || 0;
+  State.hintsRemainingGifted = myHints.remainingGifted || 0;
+  State.hintsUsedOwn = myHints.usedOwn || 0;
+  State.hintsUsedGifted = myHints.usedGifted || 0;
+  State.lastSeenGiftReceivedTotal = State.hintsRemainingGifted + State.hintsUsedGifted;
+  State.startedAtMs = room.game.startedAt;
+  State.finishedAt = null;
+  State.lostByMistakes = false;
+  State._endSoundPlayed = false;
+  State._completedBoxes = new Set();
+  State._warnedPids = new Set();
+  State._resultRecorded = false;
+  $("#notes-state").textContent = "OFF";
+  $("#btn-notes").classList.remove("active");
+
+  // Show/hide hint button based on whether hints are enabled
+  const hintsEnabled = (room.game.hintsPerDuel ?? 0) > 0;
+  $("#btn-hint").style.display = hintsEnabled ? "" : "none";
+  $("#tool-row").classList.toggle("no-hints", !hintsEnabled);
+  updateHintBadge();
+
+  showScreen("screen-game");
+  renderOpponentsStrip(room);
+  renderBoard();
+  renderNumberPad();
+  startTimer();
+  Sound.start();
+}
+
+function bindGameEvents() {
+  $("#btn-leave-game").addEventListener("click", () => {
+    if (confirm("Leave the duel? Your opponent wins by default.")) {
+      forfeit();
+    }
+  });
+  $("#btn-erase").addEventListener("click", onErase);
+  $("#btn-notes").addEventListener("click", () => {
+    State.notesMode = !State.notesMode;
+    $("#btn-notes").classList.toggle("active", State.notesMode);
+    $("#notes-state").textContent = State.notesMode ? "ON" : "OFF";
+    Sound.tap();
+  });
+  $("#btn-hint").addEventListener("click", onUseHint);
+  document.addEventListener("keydown", onKeyDown);
+}
+
+function totalHintsRemaining() {
+  return State.hintsRemainingOwn + State.hintsRemainingGifted;
+}
+
+function updateHintBadge() {
+  const badge = $("#hint-badge");
+  if (!badge) return;
+  badge.textContent = totalHintsRemaining();
+  $("#btn-hint").disabled = totalHintsRemaining() <= 0 || State.finishedAt;
+}
+
+async function onUseHint() {
+  if (State.finishedAt) return;
+  if (totalHintsRemaining() <= 0) {
+    toast("No hints left");
+    return;
+  }
+  if (!State.selected) {
+    toast("Select a cell first");
+    return;
+  }
+  const { r, c } = State.selected;
+  const cell = State.cells[r][c];
+  if (cell.given || cell.locked) {
+    toast("Pick an empty cell");
+    return;
+  }
+
+  const correct = State.solution[r][c];
+
+  // Decide which pool to spend from: prefer gifted first (they're free, no gift back).
+  // Only when we run out of gifted do we tap our own pool — which gifts the opponent.
+  const spendingGifted = State.hintsRemainingGifted > 0;
+  if (spendingGifted) {
+    State.hintsRemainingGifted--;
+    State.hintsUsedGifted++;
+  } else {
+    State.hintsRemainingOwn--;
+    State.hintsUsedOwn++;
+  }
+
+  // Apply to board
+  cell.value = correct;
+  cell.locked = true;
+  cell.notes.clear();
+  clearInvalidatedNotes(r, c, correct);
+
+  renderBoard();
+  flashHint(r, c);
+  Sound.hintSelf();
+  updateNumberPadCounts();
+  updateHintBadge();
+
+  // Sync my state to DB
+  try {
+    await FB.update(FB.ref(DB, `rooms/${State.roomCode}/game/hints/${State.playerId}`), {
+      remainingOwn: State.hintsRemainingOwn,
+      remainingGifted: State.hintsRemainingGifted,
+      usedOwn: State.hintsUsedOwn,
+      usedGifted: State.hintsUsedGifted
+    });
+    // Only gift the opponent if we just spent an OWN hint — gifted hints do NOT gift back
+    if (!spendingGifted) {
+      const oppId = Object.keys(State.room.players).find(pid => pid !== State.playerId);
+      if (oppId) {
+        await FB.runTransaction(FB.ref(DB, `rooms/${State.roomCode}/game/hints/${oppId}`), (current) => {
+          if (!current) return { remainingOwn: 0, remainingGifted: 1, usedOwn: 0, usedGifted: 0 };
+          return {
+            remainingOwn: current.remainingOwn || 0,
+            remainingGifted: (current.remainingGifted || 0) + 1,
+            usedOwn: current.usedOwn || 0,
+            usedGifted: current.usedGifted || 0
+          };
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Hint write failed", e);
+  }
+
+  // Check completion of a 3x3 box
+  maybeCelebrateBoxCompletion(r, c);
+
+  pushProgress(true);
+  if (isSolved()) onSolved();
+}
+
+function maybeCelebrateBoxCompletion(r, c) {
+  const br = Math.floor(r/3) * 3, bc = Math.floor(c/3) * 3;
+  // Check whether all 9 cells in this 3x3 box are correctly filled (given or locked)
+  let allFilled = true;
+  for (let i = br; i < br+3 && allFilled; i++) {
+    for (let j = bc; j < bc+3; j++) {
+      const cell = State.cells[i][j];
+      if (!cell.value || (!cell.given && !cell.locked)) { allFilled = false; break; }
+      if (cell.value !== State.solution[i][j]) { allFilled = false; break; }
+    }
+  }
+  if (!allFilled) return;
+  // Avoid celebrating the same box repeatedly
+  State._completedBoxes = State._completedBoxes || new Set();
+  const key = `${br}_${bc}`;
+  if (State._completedBoxes.has(key)) return;
+  State._completedBoxes.add(key);
+  // Visual + audio celebration
+  flashBox(br, bc);
+  Sound.boxComplete();
+}
+
+function flashBox(br, bc) {
+  for (let i = br; i < br+3; i++) {
+    for (let j = bc; j < bc+3; j++) {
+      const div = $(`#board .cell[data-row="${i}"][data-col="${j}"]`);
+      if (!div) continue;
+      div.classList.remove("box-flash");
+      void div.offsetWidth;
+      // Stagger the flash for a sweeping effect
+      const delay = ((i - br) * 3 + (j - bc)) * 40;
+      setTimeout(() => div.classList.add("box-flash"), delay);
+      setTimeout(() => div.classList.remove("box-flash"), delay + 800);
+    }
+  }
+}
+
+function flashHint(r, c) {
+  const div = $(`#board .cell[data-row="${r}"][data-col="${c}"]`);
+  if (!div) return;
+  div.classList.remove("hint-flash");
+  void div.offsetWidth;
+  div.classList.add("hint-flash");
+  // Pulse the hint button too
+  const btn = $("#btn-hint");
+  btn.classList.remove("hint-pulse");
+  void btn.offsetWidth;
+  btn.classList.add("hint-pulse");
+}
+
+async function forfeit() {
+  if (!State.room) return;
+  cancelDisconnectHandlers();
+  await FB.update(FB.ref(DB, `rooms/${State.roomCode}/game/finished/${State.playerId}`), {
+    status: "forfeit",
+    time: getElapsedSec(),
+    mistakes: State.mistakes,
+    at: Date.now()
+  });
+  // Let the room update flow handle the end screen
+  setTimeout(() => leaveRoom(), 400);
+}
+
+function leaveRoom() {
+  stopTimer();
+  cancelDisconnectHandlers();
+  if (State.unsubRoom) { State.unsubRoom(); State.unsubRoom = null; }
+  if (State.roomCode && CONFIGURED) {
+    FB.remove(FB.ref(DB, `rooms/${State.roomCode}/players/${State.playerId}`)).catch(() => {});
+  }
+  State.roomCode = null;
+  State.room = null;
+  State.isCreator = false;
+  State._lastOppCount = 0;
+  State._endSoundPlayed = false;
+  State._warnedPids = new Set();
+  State._resultRecorded = false;
+  $("#end-modal-backdrop").classList.remove("active");
+  showScreen("screen-home");
+  renderRivalry();
+}
+
+/* ============================================================
+   BOARD RENDERING
+   ============================================================ */
+
+function renderBoard() {
+  const board = $("#board");
+  board.innerHTML = "";
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const cell = State.cells[r][c];
+      const div = document.createElement("div");
+      div.className = "cell";
+      div.dataset.row = r;
+      div.dataset.col = c;
+      if (cell.given) div.classList.add("given");
+      else if (cell.locked) div.classList.add("locked");
+      else if (cell.value) div.classList.add("user-filled");
+
+      if (cell.value) {
+        div.textContent = cell.value;
+      } else if (cell.notes.size) {
+        const notesDiv = document.createElement("div");
+        notesDiv.className = "notes";
+        for (let n = 1; n <= 9; n++) {
+          const span = document.createElement("span");
+          span.textContent = cell.notes.has(n) ? n : "";
+          notesDiv.appendChild(span);
+        }
+        div.appendChild(notesDiv);
+      }
+      div.addEventListener("click", () => selectCell(r, c));
+      board.appendChild(div);
+    }
+  }
+  applyHighlights();
+}
+
+function applyHighlights() {
+  const cells = $$("#board .cell");
+  cells.forEach(div => {
+    div.classList.remove("highlighted-region", "highlighted-number", "selected");
+  });
+
+  if (!State.selected) return;
+  const { r: sr, c: sc } = State.selected;
+  const selectedValue = State.cells[sr][sc].value;
+
+  cells.forEach(div => {
+    const r = +div.dataset.row, c = +div.dataset.col;
+    const cell = State.cells[r][c];
+    // Highlight only the row and column of the selected cell — the 3x3 box is visually obvious from the grid structure
+    const inRegion = r === sr || c === sc;
+    if (inRegion) div.classList.add("highlighted-region");
+    if (selectedValue && cell.value === selectedValue) div.classList.add("highlighted-number");
+    if (r === sr && c === sc) div.classList.add("selected");
+  });
+}
+
+function selectCell(r, c) {
+  if (!State.selected || State.selected.r !== r || State.selected.c !== c) {
+    Sound.select();
+  }
+  State.selected = { r, c };
+  applyHighlights();
+}
+
+// Clear a digit from all notes in the same row, column, and 3x3 box as cell (r,c).
+function clearInvalidatedNotes(r, c, digit) {
+  for (let i = 0; i < 9; i++) {
+    State.cells[r][i].notes.delete(digit);
+    State.cells[i][c].notes.delete(digit);
+  }
+  const br = Math.floor(r/3) * 3, bc = Math.floor(c/3) * 3;
+  for (let i = br; i < br+3; i++) {
+    for (let j = bc; j < bc+3; j++) {
+      State.cells[i][j].notes.delete(digit);
+    }
+  }
+}
+
+/* ============================================================
+   NUMBER PAD
+   ============================================================ */
+
+function renderNumberPad() {
+  const pad = $("#num-pad");
+  pad.innerHTML = "";
+  for (let n = 1; n <= 9; n++) {
+    const btn = document.createElement("button");
+    btn.className = "num-btn";
+    btn.dataset.num = n;
+    btn.innerHTML = `${n}<span class="remaining"></span>`;
+    btn.addEventListener("click", () => enterNumber(n));
+    pad.appendChild(btn);
+  }
+  updateNumberPadCounts();
+}
+
+function updateNumberPadCounts() {
+  // Count how many of each digit are placed correctly (given or locked)
+  const counts = Array(10).fill(0);
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    const cell = State.cells[r][c];
+    if (cell.value && (cell.given || cell.locked)) counts[cell.value]++;
+  }
+  $$(".num-btn").forEach(b => {
+    const n = +b.dataset.num;
+    const remaining = 9 - counts[n];
+    b.querySelector(".remaining").textContent = remaining > 0 ? remaining : "";
+    b.classList.toggle("exhausted", remaining <= 0);
+  });
+}
+
+/* ============================================================
+   GAMEPLAY: number entry, validation, notes
+   ============================================================ */
+
+function enterNumber(n) {
+  if (!State.selected) return;
+  if (State.finishedAt) return;
+  const { r, c } = State.selected;
+  const cell = State.cells[r][c];
+  if (cell.given || cell.locked) return;
+
+  if (State.notesMode) {
+    if (cell.notes.has(n)) cell.notes.delete(n);
+    else cell.notes.add(n);
+    cell.value = 0;
+    Sound.note();
+    renderBoard();
+    return;
+  }
+
+  // Real entry
+  if (n === State.solution[r][c]) {
+    cell.value = n;
+    cell.locked = true;
+    cell.notes.clear();
+    clearInvalidatedNotes(r, c, n);
+    Sound.correct();
+    renderBoard();
+    flashEntered(r, c);
+    updateNumberPadCounts();
+    pushProgress();
+    maybeCelebrateBoxCompletion(r, c);
+    if (isSolved()) onSolved();
+  } else {
+    Sound.wrong();
+    flashError(r, c);
+    State.mistakes++;
+    pushProgress();
+    if (State.room.game.mistakeLimit > 0 && State.mistakes >= State.room.game.mistakeLimit) {
+      onLostByMistakes();
+    }
+  }
+}
+
+function onErase() {
+  if (!State.selected) return;
+  if (State.finishedAt) return;
+  const { r, c } = State.selected;
+  const cell = State.cells[r][c];
+  if (cell.given || cell.locked) return;
+  if (cell.notes.size || cell.value) Sound.erase();
+  if (cell.notes.size) cell.notes.clear();
+  cell.value = 0;
+  renderBoard();
+}
+
+function onKeyDown(e) {
+  if (!$("#screen-game").classList.contains("active")) return;
+  if (!State.selected) return;
+  if (e.key >= "1" && e.key <= "9") {
+    enterNumber(parseInt(e.key, 10));
+    return;
+  }
+  if (e.key === "0") { onErase(); return; }
+  if (e.key.startsWith("Arrow")) {
+    let { r, c } = State.selected;
+    if (e.key === "ArrowUp") r = Math.max(0, r-1);
+    if (e.key === "ArrowDown") r = Math.min(8, r+1);
+    if (e.key === "ArrowLeft") c = Math.max(0, c-1);
+    if (e.key === "ArrowRight") c = Math.min(8, c+1);
+    selectCell(r, c);
+    e.preventDefault();
+    return;
+  }
+  // Custom keybinds
+  const action = Keybinds.lookup(e.key);
+  if (action === "erase") onErase();
+  else if (action === "notes") $("#btn-notes").click();
+  else if (action === "hint") {
+    if (!$("#btn-hint").disabled && $("#btn-hint").style.display !== "none") {
+      $("#btn-hint").click();
+    }
+  }
+}
+
+function flashEntered(r, c) {
+  const div = $(`#board .cell[data-row="${r}"][data-col="${c}"]`);
+  if (!div) return;
+  div.classList.remove("entered");
+  void div.offsetWidth;
+  div.classList.add("entered");
+}
+
+function flashError(r, c) {
+  const div = $(`#board .cell[data-row="${r}"][data-col="${c}"]`);
+  if (!div) return;
+  div.classList.remove("error-flash");
+  void div.offsetWidth;
+  div.classList.add("error-flash");
+}
+
+function isSolved() {
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    if (State.cells[r][c].value !== State.solution[r][c]) return false;
+  }
+  return true;
+}
+
+/* ============================================================
+   PROGRESS SYNC
+   ============================================================ */
+
+function getElapsedSec() {
+  if (!State.startedAtMs) return 0;
+  const end = State.finishedAt || Date.now();
+  return Math.floor((end - State.startedAtMs) / 1000);
+}
+
+function getFilledCount() {
+  let count = 0;
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    if (State.cells[r][c].locked || State.cells[r][c].given) count++;
+  }
+  return count;
+}
+
+let lastPushedAt = 0;
+async function pushProgress(force = false) {
+  if (!CONFIGURED || !State.roomCode) return;
+  const now = Date.now();
+  if (!force && now - lastPushedAt < 250) return; // simple throttle
+  lastPushedAt = now;
+  await FB.update(FB.ref(DB, `rooms/${State.roomCode}/game/progress/${State.playerId}`), {
+    filled: getFilledCount(),
+    mistakes: State.mistakes,
+    time: getElapsedSec()
+  });
+}
+
+/* ============================================================
+   TIMER
+   ============================================================ */
+
+function startTimer() {
+  stopTimer();
+  State.timerInterval = setInterval(() => {
+    if (State.finishedAt) return;
+    pushProgress();
+    renderOpponentsStrip(State.room);
+  }, 1000);
+}
+function stopTimer() {
+  if (State.timerInterval) { clearInterval(State.timerInterval); State.timerInterval = null; }
+}
+
+/* ============================================================
+   OPPONENTS STRIP
+   ============================================================ */
+
+function renderOpponentsStrip(room) {
+  if (!room || !room.game) return;
+
+  // Detect opponent-gifted hints to me (new gifts since last render)
+  const myHintData = room.game.hints && room.game.hints[State.playerId];
+  if (myHintData) {
+    const totalGiftsEverReceived = (myHintData.remainingGifted || 0) + (myHintData.usedGifted || 0);
+    if (totalGiftsEverReceived > State.lastSeenGiftReceivedTotal) {
+      const delta = totalGiftsEverReceived - State.lastSeenGiftReceivedTotal;
+      const oppIdLookup = Object.keys(room.players).find(pid => pid !== State.playerId);
+      const oppName = (oppIdLookup && room.players[oppIdLookup] && room.players[oppIdLookup].name) || "Opponent";
+      toast(`${oppName} used a hint — you got ${delta === 1 ? "a free one" : delta + " free ones"}`, 2600);
+      Sound.hintGift();
+      // Sync local gifted-remaining to authoritative value from DB
+      State.hintsRemainingGifted = myHintData.remainingGifted || 0;
+      State.lastSeenGiftReceivedTotal = totalGiftsEverReceived;
+      updateHintBadge();
+      // Visual pulse on the hint button
+      const btn = $("#btn-hint");
+      if (btn) {
+        btn.classList.remove("hint-pulse");
+        void btn.offsetWidth;
+        btn.classList.add("hint-pulse");
+      }
+    }
+  }
+
+  const strip = $("#opponents-strip");
+  strip.innerHTML = "";
+  const playerIds = Object.keys(room.players || {});
+  // Always show ours first
+  const ordered = [State.playerId, ...playerIds.filter(pid => pid !== State.playerId)];
+
+  // Track which opponents have already triggered the warning flash so we only flash once
+  State._warnedPids = State._warnedPids || new Set();
+
+  for (const pid of ordered) {
+    const p = room.players[pid];
+    if (!p) continue;
+    const isMe = pid === State.playerId;
+    const progress = (room.game.progress && room.game.progress[pid]) || { filled: 0, mistakes: 0, time: 0 };
+    const hintData = (room.game.hints && room.game.hints[pid]) || { remainingOwn: 0, remainingGifted: 0, usedOwn: 0, usedGifted: 0 };
+    const liveTime = isMe ? getElapsedSec() : progress.time;
+    const filledPct = Math.min(100, Math.round((progress.filled / 81) * 100));
+    const cellsLeft = Math.max(0, 81 - (progress.filled || 0));
+    const mistakeLimit = room.game.mistakeLimit;
+    const mistakesDanger = mistakeLimit > 0 && progress.mistakes >= mistakeLimit - 1;
+    const hintsEnabled = (room.game.hintsPerDuel ?? 0) > 0;
+    const hintsUsedTotal = (hintData.usedOwn || 0) + (hintData.usedGifted || 0);
+    const hintsLeftTotal = (hintData.remainingOwn || 0) + (hintData.remainingGifted || 0);
+
+    // Warning when opponent is closing in: cells left <= ~10% (i.e. 8 cells or fewer)
+    // Only for the OTHER player, not yourself
+    const isOpponentClose = !isMe && cellsLeft > 0 && cellsLeft <= 8 && !State.finishedAt;
+    const justCrossed = isOpponentClose && !State._warnedPids.has(pid);
+    if (justCrossed) {
+      State._warnedPids.add(pid);
+      Sound.opponentClosing();
+    }
+
+    const div = document.createElement("div");
+    let cls = "player-strip" + (isMe ? " you" : "");
+    if (isOpponentClose) cls += " opponent-warning-sustained";
+    if (justCrossed) cls += " opponent-warning";
+    div.className = cls;
+
+    div.innerHTML = `
+      <div class="name-row">
+        <span class="player-name">${escapeHTML(p.name)}${isMe ? ' <span style="color:var(--accent);font-size:10px;letter-spacing:1px;">YOU</span>' : ''}</span>
+        <span class="timer">${fmtTime(liveTime)}</span>
+      </div>
+      <div class="meta-row">
+        <span class="cells-left">${cellsLeft} ${cellsLeft === 1 ? 'cell' : 'cells'} left <span class="filled-pct">· ${filledPct}%</span></span>
+        <span class="mistakes-count ${mistakesDanger ? 'danger' : ''}">
+          ${mistakeLimit > 0 ? `${progress.mistakes} / ${mistakeLimit} mistakes` : `${progress.mistakes} mistakes`}
+        </span>
+      </div>
+      ${hintsEnabled ? `<div class="meta-row">
+        <span>${hintsUsedTotal} hint${hintsUsedTotal === 1 ? '' : 's'} used</span>
+        <span>${hintsLeftTotal} left</span>
+      </div>` : ''}
+      <div class="progress-bar" style="width:${filledPct}%"></div>
+    `;
+    strip.appendChild(div);
+  }
+}
+
+/* ============================================================
+   END CONDITIONS
+   ============================================================ */
+
+async function onSolved() {
+  State.finishedAt = Date.now();
+  stopTimer();
+  updateHintBadge();
+  cancelDisconnectHandlers();
+  await FB.update(FB.ref(DB, `rooms/${State.roomCode}/game/finished/${State.playerId}`), {
+    status: "won",
+    time: getElapsedSec(),
+    mistakes: State.mistakes,
+    at: Date.now()
+  });
+  await pushProgress(true);
+  // The room listener will pick up the finish and show end screen
+}
+
+async function onLostByMistakes() {
+  State.finishedAt = Date.now();
+  State.lostByMistakes = true;
+  stopTimer();
+  updateHintBadge();
+  cancelDisconnectHandlers();
+  await FB.update(FB.ref(DB, `rooms/${State.roomCode}/game/finished/${State.playerId}`), {
+    status: "lost",
+    time: getElapsedSec(),
+    mistakes: State.mistakes,
+    at: Date.now()
+  });
+  await pushProgress(true);
+}
+
+function maybeEndOnOpponentFinish(room) {
+  if (!room.game || !room.game.finished) return;
+  const finishedIds = Object.keys(room.game.finished);
+  const myFinish = room.game.finished[State.playerId];
+  const oppId = Object.keys(room.players).find(pid => pid !== State.playerId);
+  const oppFinish = oppId ? room.game.finished[oppId] : null;
+
+  // Has anyone won?
+  const someoneWon = finishedIds.find(pid => room.game.finished[pid].status === "won");
+  if (someoneWon) {
+    if (!myFinish) {
+      State.finishedAt = Date.now();
+      stopTimer();
+    }
+    showEndModal(room);
+    return;
+  }
+
+  // If opponent mistake-outed or forfeited, the duel ends and I win
+  if (oppFinish && (oppFinish.status === "lost" || oppFinish.status === "forfeit")) {
+    if (!myFinish) {
+      State.finishedAt = Date.now();
+      stopTimer();
+    }
+    showEndModal(room);
+    return;
+  }
+
+  // If *I* mistake-outed, the duel ends for me too
+  if (myFinish && (myFinish.status === "lost" || myFinish.status === "forfeit")) {
+    showEndModal(room);
+    return;
+  }
+}
+
+function showEndModal(room) {
+  // Determine outcome
+  const me = room.game.finished[State.playerId];
+  const oppId = Object.keys(room.players).find(pid => pid !== State.playerId);
+  const opp = oppId ? room.game.finished[oppId] : null;
+  const oppName = (room.players[oppId] && room.players[oppId].name) || "Opponent";
+
+  let outcome = "draw";
+  let title = "Draw";
+  let sub = "";
+  if (me && me.status === "won") {
+    outcome = "win";
+    title = "Victory";
+    sub = `You solved it in ${fmtTime(me.time)}.`;
+  } else if (opp && opp.status === "won") {
+    outcome = "loss";
+    title = "So close";
+    sub = `${oppName} got there first.`;
+  } else if (me && me.status === "lost" && opp && opp.status === "lost") {
+    outcome = "draw";
+    title = "Stalemate";
+    sub = "Both of you hit the mistake limit.";
+  } else if (me && me.status === "lost") {
+    outcome = "loss";
+    title = "Too many mistakes";
+    sub = "You hit the mistake limit.";
+  } else if (opp && opp.status === "lost") {
+    outcome = "win";
+    title = "Victory";
+    sub = `${oppName} ran out of mistakes.`;
+  } else if (me && me.status === "forfeit") {
+    outcome = "loss";
+    title = "Forfeit";
+    sub = "You left the duel.";
+  } else if (opp && opp.status === "forfeit") {
+    outcome = "win";
+    title = "Walkover";
+    sub = `${oppName} left the duel.`;
+  } else {
+    outcome = "draw";
+    title = "Stalemate";
+    sub = "No one finished — both hit limits.";
+  }
+
+  // Record into shared rivalry — but ONLY ONCE per duel, AND only on the winning client.
+  // Both players' clients run showEndModal, so if we recorded on both, every win would be counted twice.
+  // The winner records; the loser skips. (Draws don't record at all.)
+  if (!State._resultRecorded && outcome === "win") {
+    State._resultRecorded = true;
+    recordResult(true, oppName);
+  }
+
+  // Render
+  const modal = $("#end-modal");
+  modal.classList.remove("win", "loss", "draw");
+  modal.classList.add(outcome);
+  $("#result-title").textContent = title;
+  $("#result-sub").textContent = sub;
+  $("#result-label").textContent = outcome === "win" ? "VICTORY" : outcome === "loss" ? "DEFEAT" : "RESULT";
+
+  const stats = $("#result-stats");
+  stats.innerHTML = "";
+  for (const [pid, label, isYou] of [
+    [State.playerId, "YOU", true],
+    [oppId, oppName.toUpperCase(), false]
+  ]) {
+    if (!pid) continue;
+    const f = room.game.finished[pid];
+    const live = room.game.progress && room.game.progress[pid];
+    const hintData = (room.game.hints && room.game.hints[pid]) || { usedOwn: 0, usedGifted: 0 };
+    const winner = f && f.status === "won";
+    const time = f ? f.time : (live ? live.time : 0);
+    const mistakes = f ? f.mistakes : (live ? live.mistakes : 0);
+    const hintsUsed = (hintData.usedOwn || 0) + (hintData.usedGifted || 0);
+    const hintsEnabled = (room.game.hintsPerDuel ?? 0) > 0;
+    const statusText = f ? (f.status === "won" ? "Solved" : f.status === "lost" ? "Mistake-out" : f.status === "forfeit" ? "Forfeited" : "—") : "Did not finish";
+    const detailBits = [statusText, `${mistakes} mistake${mistakes === 1 ? '' : 's'}`];
+    if (hintsEnabled) detailBits.push(`${hintsUsed} hint${hintsUsed === 1 ? '' : 's'}`);
+    const card = document.createElement("div");
+    card.className = "stat-card" + (winner ? " winner" : "");
+    card.innerHTML = `
+      <div class="who ${isYou ? 'you-tag' : ''}">${label}</div>
+      <div class="value">${fmtTime(time)}</div>
+      <div class="detail">${detailBits.join(" · ")}</div>
+    `;
+    stats.appendChild(card);
+  }
+
+  // Play outcome sound, but only once per duel
+  if (!State._endSoundPlayed) {
+    State._endSoundPlayed = true;
+    if (outcome === "win") Sound.victory();
+    else if (outcome === "loss") Sound.defeat();
+  }
+
+  $("#end-modal-backdrop").classList.add("active");
+}
+
+function bindModalEvents() {
+  $("#btn-rematch").addEventListener("click", async () => {
+    if (!State.roomCode || !CONFIGURED) {
+      leaveRoom();
+      return;
+    }
+    // Reset the room: clear game + reset ready
+    const updates = {};
+    updates[`rooms/${State.roomCode}/status`] = "lobby";
+    updates[`rooms/${State.roomCode}/game`] = null;
+    Object.keys(State.room.players || {}).forEach(pid => {
+      updates[`rooms/${State.roomCode}/players/${pid}/ready`] = false;
+    });
+    await FB.update(FB.ref(DB), updates);
+    $("#end-modal-backdrop").classList.remove("active");
+    showScreen("screen-lobby");
+  });
+  $("#btn-home-from-end").addEventListener("click", leaveRoom);
+}
+
+</script>
+
+</body>
+</html>
