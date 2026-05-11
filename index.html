@@ -98,6 +98,38 @@ input { font-family: inherit; }
   margin-top: 32px;
 }
 
+.invite-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  text-align: center;
+}
+.invite-banner .invite-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--ink-soft);
+}
+.invite-banner .invite-code {
+  font-family: 'Fraunces', serif;
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: 6px;
+  color: var(--accent);
+  line-height: 1;
+}
+.invite-banner .invite-sub {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
 .btn {
   padding: 18px 24px;
   border-radius: 14px;
@@ -802,6 +834,10 @@ input[type=range]::-moz-range-thumb {
   color: var(--ink-faint);
   opacity: 0.4;
 }
+.num-btn.num-active {
+  background: var(--highlight-strong);
+  border-color: var(--ink-soft);
+}
 .num-btn .remaining {
   position: absolute;
   bottom: 2px;
@@ -1160,6 +1196,12 @@ input[type=range]::-moz-range-thumb {
       <p>A race against your favourite rival.</p>
     </div>
 
+    <div class="invite-banner" id="invite-banner" style="display:none;">
+      <span class="invite-label">You're joining duel</span>
+      <span class="invite-code" id="invite-banner-code">ABCD</span>
+      <span class="invite-sub">Enter your name below to continue.</span>
+    </div>
+
     <div class="field">
       <label for="player-name">Your name</label>
       <input type="text" id="player-name" maxlength="20" placeholder="e.g. Alex" autocomplete="off" />
@@ -1273,7 +1315,8 @@ input[type=range]::-moz-range-thumb {
     <div class="room-code-display">
       <div class="label">Share this code</div>
       <div class="code" id="lobby-code" title="Tap to copy">····</div>
-      <div class="hint">Tap to copy</div>
+      <div class="hint">Tap code to copy</div>
+      <button class="btn-tiny" id="btn-share-link" style="margin-top:10px;">Copy invite link</button>
     </div>
 
     <div class="players-row" id="players-row">
@@ -1350,7 +1393,7 @@ input[type=range]::-moz-range-thumb {
         <span class="slider-label" id="hints-label">hints</span>
       </div>
       <p style="font-size:11px; color:var(--ink-faint); margin-top:10px; line-height:1.5; font-style:italic;">
-        Using a hint reveals one cell — but your opponent also gets a free hint added to their pool.
+        Hints reveal a random empty cell on your board. The catch: your opponent gets a free reveal too, on their board — same moment. Choose your moments.
       </p>
     </div>
 
@@ -1695,13 +1738,12 @@ const State = {
   cells: null,        // 9x9 of {value, given, locked, notes:Set}
   solution: null,
   selected: null,     // {r, c}
+  highlightedNumber: 0,  // explicit pinned number from number-pad clicks (0 = use selected cell's value)
   notesMode: false,
   mistakes: 0,
-  hintsRemainingOwn: 0,
-  hintsRemainingGifted: 0,
-  hintsUsedOwn: 0,
-  hintsUsedGifted: 0,
-  lastSeenGiftReceivedTotal: 0,  // tracks total gifts received (own.usedOwn from opponent) for toast detection
+  hintsRemaining: 0,
+  hintsUsed: 0,
+  lastAcknowledgedFreebies: 0,  // how many freebie reveals we've already shown locally
   startedAtMs: null,
   timerInterval: null,
   finishedAt: null,
@@ -1987,6 +2029,29 @@ function init() {
 
   // Try to restore the last rivalry so the score appears immediately on home
   restoreLastRivalry();
+
+  // If the URL has a ?join=CODE parameter, the user came from an invite link.
+  // Show the banner with the pre-filled code so they know what to do.
+  const params = new URLSearchParams(location.search);
+  const inviteCode = (params.get("join") || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  if (inviteCode.length === 4) {
+    State._pendingInviteCode = inviteCode;
+    $("#invite-banner-code").textContent = inviteCode;
+    $("#invite-banner").style.display = "flex";
+    // Pre-fill the join input so the user just has to click "Join with code"
+    $("#join-code").value = inviteCode;
+    // Make the secondary join button look primary, and vice versa
+    $("#btn-join-open").classList.remove("btn-secondary");
+    $("#btn-join-open").classList.add("btn-primary");
+    $("#btn-create").classList.remove("btn-primary");
+    $("#btn-create").classList.add("btn-secondary");
+    // If they have a saved name already, focus the join button; otherwise the name field
+    if (savedName) {
+      setTimeout(() => $("#btn-join-open").focus(), 100);
+    } else {
+      setTimeout(() => $("#player-name").focus(), 100);
+    }
+  }
 
   if (window.__dlog) window.__dlog('All handlers bound. Ready for clicks.');
 
@@ -2557,18 +2622,14 @@ async function onCreateRoom() {
 
   try {
     if (window.__dlog) window.__dlog('Attempting to create room…');
-    // Try a few codes until we find a free one
-    for (let attempt = 0; attempt < 6; attempt++) {
+    // Try a few codes until we find a free one. Use runTransaction so that simultaneous
+    // creates by different users can't blow each other's rooms away.
+    for (let attempt = 0; attempt < 8; attempt++) {
       const code = randomCode(4);
       if (window.__dlog) window.__dlog('Trying code: ' + code);
       const roomRef = FB.ref(DB, `rooms/${code}`);
-      const snap = await FB.get(roomRef);
-      if (snap.exists() && snap.val().status !== "ended") {
-        if (window.__dlog) window.__dlog('Code in use, trying again');
-        continue;
-      }
 
-      const room = {
+      const newRoom = {
         code,
         status: "lobby",
         createdAt: Date.now(),
@@ -2587,13 +2648,25 @@ async function onCreateRoom() {
           }
         }
       };
-      if (window.__dlog) window.__dlog('Writing room ' + code + ' to database…');
-      await FB.set(roomRef, room);
-      if (window.__dlog) window.__dlog('Room ' + code + ' written! Switching to lobby.');
-      State.roomCode = code;
-      State.isCreator = true;
-      attachRoom(code);
-      return;
+
+      // Transaction: only write if path is empty (no existing room).
+      // Returning undefined from the callback aborts the transaction.
+      const result = await FB.runTransaction(roomRef, (current) => {
+        if (current !== null && current !== undefined) {
+          // Someone else owns this code — abort, we'll try another code
+          return; // undefined aborts
+        }
+        return newRoom;
+      });
+
+      if (result && result.committed) {
+        if (window.__dlog) window.__dlog('Room ' + code + ' written! Switching to lobby.');
+        State.roomCode = code;
+        State.isCreator = true;
+        attachRoom(code);
+        return;
+      }
+      if (window.__dlog) window.__dlog('Code ' + code + ' was already taken — retrying');
     }
     toast("Couldn't create a room — try again");
   } catch (e) {
@@ -2632,34 +2705,37 @@ async function onJoinConfirm() {
   }
 
   const roomRef = FB.ref(DB, `rooms/${code}`);
-  const snap = await FB.get(roomRef);
-  if (!snap.exists()) {
-    $("#join-error").textContent = "No room with that code.";
-    $("#join-error").style.display = "block";
-    return;
-  }
-  const room = snap.val();
-  if (room.status === "ended") {
-    $("#join-error").textContent = "That duel has already ended.";
-    $("#join-error").style.display = "block";
-    return;
-  }
 
-  const playerCount = Object.keys(room.players || {}).length;
-  const alreadyIn = room.players && room.players[State.playerId];
-  if (!alreadyIn && playerCount >= 2) {
-    $("#join-error").textContent = "Room is full.";
-    $("#join-error").style.display = "block";
-    return;
-  }
-
-  // Add ourselves
-  await FB.update(FB.ref(DB, `rooms/${code}/players/${State.playerId}`), {
-    name: State.playerName,
-    ready: false,
-    joinedAt: Date.now(),
-    isCreator: false
+  // Use a transaction so we read & write atomically, preventing two people
+  // from both passing the "room not full" check and squeezing in as a third.
+  let joinError = null;
+  const result = await FB.runTransaction(roomRef, (room) => {
+    if (!room) { joinError = "No room with that code."; return; }
+    if (room.status === "ended") { joinError = "That duel has already ended."; return; }
+    if (room.status === "playing") { joinError = "That duel is already in progress."; return; }
+    const players = room.players || {};
+    const playerIds = Object.keys(players);
+    const alreadyIn = !!players[State.playerId];
+    if (!alreadyIn && playerIds.length >= 2) {
+      joinError = "Room is full.";
+      return;
+    }
+    // Safe to add ourselves
+    room.players = room.players || {};
+    room.players[State.playerId] = {
+      name: State.playerName,
+      ready: false,
+      joinedAt: Date.now(),
+      isCreator: false
+    };
+    return room;
   });
+
+  if (joinError || !result || !result.committed) {
+    $("#join-error").textContent = joinError || "Couldn't join — try again.";
+    $("#join-error").style.display = "block";
+    return;
+  }
 
   State.roomCode = code;
   State.isCreator = false;
@@ -2680,7 +2756,11 @@ function attachRoom(code) {
   if (State.unsubRoom) State.unsubRoom();
   const cb = FB.onValue(roomRef, (snap) => {
     if (!snap.exists()) {
-      toast("Room was closed");
+      // Room was deleted (either we left, or the host left and tore it down)
+      // Only show the "closed by host" toast if we weren't the ones who left.
+      if (State.roomCode === code && !State._intentionallyLeaving) {
+        toast("Host left — room closed", 3000);
+      }
       leaveRoom();
       return;
     }
@@ -2689,15 +2769,38 @@ function attachRoom(code) {
   });
   State.unsubRoom = () => FB.off(roomRef, "value", cb);
 
-  // Set up disconnect cleanup:
-  // 1) Remove our player record (so the lobby clears the slot)
-  // 2) Write a forfeit so the opponent's room update detects it and gets the win
-  // We track the handles so we can CANCEL them when the game ends cleanly
-  // (otherwise a clean win followed by closing the tab would overwrite our "won" status).
-  State._disconnectPlayerRef = FB.ref(DB, `rooms/${code}/players/${State.playerId}`);
-  State._disconnectFinishRef = FB.ref(DB, `rooms/${code}/game/finished/${State.playerId}`);
-  FB.onDisconnect(State._disconnectPlayerRef).remove();
-  FB.onDisconnect(State._disconnectFinishRef).set({
+  // Set up disconnect cleanup. Behavior depends on whether we're the host and whether the game has started.
+  // We attach the player-remove handler now; the host-tears-down-room handler is set up dynamically
+  // because the game-vs-lobby distinction matters: once the game starts, we want a forfeit, not a deletion.
+  refreshDisconnectHandlers(code);
+}
+
+// Attach the right onDisconnect handlers based on current host/game state.
+// Called after attachRoom and again whenever status flips (lobby -> playing).
+function refreshDisconnectHandlers(code) {
+  // Cancel any previous handlers first to avoid double-actions
+  cancelDisconnectHandlers();
+
+  const playerRef = FB.ref(DB, `rooms/${code}/players/${State.playerId}`);
+  const finishRef = FB.ref(DB, `rooms/${code}/game/finished/${State.playerId}`);
+  const roomRef = FB.ref(DB, `rooms/${code}`);
+
+  State._disconnectPlayerRef = playerRef;
+  State._disconnectFinishRef = finishRef;
+  State._disconnectRoomRef = roomRef;
+
+  // The HOST tearing down the whole room on disconnect (only relevant if we're the host).
+  // We always queue this, but it gets cancelled if game.startedAt is set, since by then
+  // forfeit-on-disconnect takes over.
+  if (State.isCreator) {
+    FB.onDisconnect(roomRef).remove();
+  }
+
+  // Also remove our own player record — useful for the guest in the lobby (host won't care; whole room is going).
+  FB.onDisconnect(playerRef).remove();
+
+  // Forfeit-on-disconnect (only relevant once the game is in progress).
+  FB.onDisconnect(finishRef).set({
     status: "forfeit",
     time: 0,
     mistakes: 0,
@@ -2707,22 +2810,35 @@ function attachRoom(code) {
 
 function cancelDisconnectHandlers() {
   // Cancel queued onDisconnect operations so a clean exit doesn't accidentally
-  // get marked as a forfeit. Safe to call multiple times.
+  // trigger room-deletion or forfeit. Safe to call multiple times.
   try {
     if (State._disconnectPlayerRef) FB.onDisconnect(State._disconnectPlayerRef).cancel();
     if (State._disconnectFinishRef) FB.onDisconnect(State._disconnectFinishRef).cancel();
+    if (State._disconnectRoomRef) FB.onDisconnect(State._disconnectRoomRef).cancel();
   } catch (e) { /* not fatal */ }
   State._disconnectPlayerRef = null;
   State._disconnectFinishRef = null;
+  State._disconnectRoomRef = null;
 }
 
 function bindLobbyEvents() {
-  $("#btn-leave-lobby").addEventListener("click", leaveRoom);
+  $("#btn-leave-lobby").addEventListener("click", leaveLobby);
 
   $("#lobby-code").addEventListener("click", () => {
     const code = $("#lobby-code").textContent;
     navigator.clipboard.writeText(code).then(
       () => toast("Code copied ✓"),
+      () => toast("Couldn't copy — share manually")
+    );
+  });
+
+  $("#btn-share-link").addEventListener("click", () => {
+    const code = $("#lobby-code").textContent;
+    // Strip any existing query/hash, then add ?join=CODE
+    const base = location.origin + location.pathname;
+    const url = base + "?join=" + code;
+    navigator.clipboard.writeText(url).then(
+      () => toast("Invite link copied ✓", 2400),
       () => toast("Couldn't copy — share manually")
     );
   });
@@ -2815,6 +2931,10 @@ function onRoomUpdate(room) {
     renderLobby(room);
   } else if (room.status === "playing") {
     if (!$("#screen-game").classList.contains("active")) {
+      // Lobby → playing transition: re-attach disconnect handlers so the host's
+      // disconnect no longer wipes the whole room (forfeit-on-disconnect takes over).
+      State._gameStarted = true;
+      refreshDisconnectHandlersForGame();
       startGameFromRoom(room);
     } else {
       renderOpponentsStrip(room);
@@ -2823,6 +2943,24 @@ function onRoomUpdate(room) {
   } else if (room.status === "ended") {
     // handled inside the game flow
   }
+}
+
+// Re-arm disconnect handlers for the playing phase: no more room teardown, just forfeit.
+function refreshDisconnectHandlersForGame() {
+  if (!State.roomCode) return;
+  cancelDisconnectHandlers();
+  const playerRef = FB.ref(DB, `rooms/${State.roomCode}/players/${State.playerId}`);
+  const finishRef = FB.ref(DB, `rooms/${State.roomCode}/game/finished/${State.playerId}`);
+  State._disconnectPlayerRef = playerRef;
+  State._disconnectFinishRef = finishRef;
+  // Note: NOT setting up roomRef teardown anymore — game is in progress.
+  FB.onDisconnect(playerRef).remove();
+  FB.onDisconnect(finishRef).set({
+    status: "forfeit",
+    time: 0,
+    mistakes: 0,
+    at: { ".sv": "timestamp" }
+  });
 }
 
 function renderLobby(room) {
@@ -2900,6 +3038,8 @@ function renderLobby(room) {
   const allReady = playerIds.length === 2 && playerIds.every(pid => room.players[pid].ready);
   if (playerIds.length < 2) {
     $("#ready-hint").textContent = "Share the code with your opponent.";
+  } else if (playerIds.length > 2) {
+    $("#ready-hint").textContent = "Room is overcrowded — please leave and create a fresh duel.";
   } else if (allReady) {
     $("#ready-hint").textContent = "Both ready! Starting…";
   } else {
@@ -2939,14 +3079,14 @@ async function startDuel(room) {
   };
   playerIds.forEach(pid => {
     game.progress[pid] = { filled: 0, mistakes: 0, time: 0 };
-    // remainingOwn: hints from your initial allotment
-    // remainingGifted: bonus hints from opponent's spending — using these does NOT gift back
-    // usedOwn / usedGifted: tracking for end-game display
+    // remaining: hints YOU still have (only drops when you click Hint).
+    // used: how many YOU spent.
+    // freebiesReceived: how many free reveals your OPPONENT has triggered for you.
+    //   Each tick of freebiesReceived = one new free cell revealed on your board.
     game.hints[pid] = {
-      remainingOwn: initialHints,
-      remainingGifted: 0,
-      usedOwn: 0,
-      usedGifted: 0
+      remaining: initialHints,
+      used: 0,
+      freebiesReceived: 0
     };
   });
   await FB.update(FB.ref(DB, `rooms/${room.code}`), {
@@ -2965,14 +3105,13 @@ function startGameFromRoom(room) {
   })));
   State.solution = solution;
   State.selected = null;
+  State.highlightedNumber = 0;
   State.notesMode = false;
   State.mistakes = 0;
   const myHints = (room.game.hints && room.game.hints[State.playerId]) || {};
-  State.hintsRemainingOwn = myHints.remainingOwn || 0;
-  State.hintsRemainingGifted = myHints.remainingGifted || 0;
-  State.hintsUsedOwn = myHints.usedOwn || 0;
-  State.hintsUsedGifted = myHints.usedGifted || 0;
-  State.lastSeenGiftReceivedTotal = State.hintsRemainingGifted + State.hintsUsedGifted;
+  State.hintsRemaining = myHints.remaining || 0;
+  State.hintsUsed = myHints.used || 0;
+  State.lastAcknowledgedFreebies = myHints.freebiesReceived || 0;
   State.startedAtMs = room.game.startedAt;
   State.finishedAt = null;
   State.lostByMistakes = false;
@@ -3000,6 +3139,7 @@ function startGameFromRoom(room) {
 function bindGameEvents() {
   $("#btn-leave-game").addEventListener("click", () => {
     if (confirm("Leave the duel? Your opponent wins by default.")) {
+      State._intentionallyLeaving = true;
       forfeit();
     }
   });
@@ -3014,91 +3154,87 @@ function bindGameEvents() {
   document.addEventListener("keydown", onKeyDown);
 }
 
-function totalHintsRemaining() {
-  return State.hintsRemainingOwn + State.hintsRemainingGifted;
-}
-
 function updateHintBadge() {
   const badge = $("#hint-badge");
   if (!badge) return;
-  badge.textContent = totalHintsRemaining();
-  $("#btn-hint").disabled = totalHintsRemaining() <= 0 || State.finishedAt;
+  badge.textContent = State.hintsRemaining;
+  $("#btn-hint").disabled = State.hintsRemaining <= 0 || State.finishedAt;
 }
 
 async function onUseHint() {
   if (State.finishedAt) return;
-  if (totalHintsRemaining() <= 0) {
+  if (State.hintsRemaining <= 0) {
     toast("No hints left");
     return;
   }
-  if (!State.selected) {
-    toast("Select a cell first");
+
+  // Pick a random empty cell on MY board
+  const target = pickRandomEmptyCell();
+  if (!target) {
+    toast("No empty cells to reveal");
     return;
   }
-  const { r, c } = State.selected;
-  const cell = State.cells[r][c];
-  if (cell.given || cell.locked) {
-    toast("Pick an empty cell");
-    return;
-  }
-
-  const correct = State.solution[r][c];
-
-  // Decide which pool to spend from: prefer gifted first (they're free, no gift back).
-  // Only when we run out of gifted do we tap our own pool — which gifts the opponent.
-  const spendingGifted = State.hintsRemainingGifted > 0;
-  if (spendingGifted) {
-    State.hintsRemainingGifted--;
-    State.hintsUsedGifted++;
-  } else {
-    State.hintsRemainingOwn--;
-    State.hintsUsedOwn++;
-  }
-
-  // Apply to board
-  cell.value = correct;
-  cell.locked = true;
-  cell.notes.clear();
-  clearInvalidatedNotes(r, c, correct);
-
-  renderBoard();
-  flashHint(r, c);
+  const { r, c } = target;
+  revealCellAsHint(r, c);
   Sound.hintSelf();
-  updateNumberPadCounts();
+
+  // Update local hint state
+  State.hintsRemaining--;
+  State.hintsUsed++;
   updateHintBadge();
 
-  // Sync my state to DB
+  // Sync my counts and signal opponent for a free reveal.
   try {
     await FB.update(FB.ref(DB, `rooms/${State.roomCode}/game/hints/${State.playerId}`), {
-      remainingOwn: State.hintsRemainingOwn,
-      remainingGifted: State.hintsRemainingGifted,
-      usedOwn: State.hintsUsedOwn,
-      usedGifted: State.hintsUsedGifted
+      remaining: State.hintsRemaining,
+      used: State.hintsUsed
     });
-    // Only gift the opponent if we just spent an OWN hint — gifted hints do NOT gift back
-    if (!spendingGifted) {
-      const oppId = Object.keys(State.room.players).find(pid => pid !== State.playerId);
-      if (oppId) {
-        await FB.runTransaction(FB.ref(DB, `rooms/${State.roomCode}/game/hints/${oppId}`), (current) => {
-          if (!current) return { remainingOwn: 0, remainingGifted: 1, usedOwn: 0, usedGifted: 0 };
-          return {
-            remainingOwn: current.remainingOwn || 0,
-            remainingGifted: (current.remainingGifted || 0) + 1,
-            usedOwn: current.usedOwn || 0,
-            usedGifted: current.usedGifted || 0
-          };
-        });
-      }
+    const oppId = Object.keys(State.room.players).find(pid => pid !== State.playerId);
+    if (oppId) {
+      // Bump opponent's freebiesReceived. Their client picks the random cell on their side.
+      await FB.runTransaction(FB.ref(DB, `rooms/${State.roomCode}/game/hints/${oppId}`), (current) => {
+        if (!current) return { remaining: 0, used: 0, freebiesReceived: 1 };
+        return {
+          remaining: current.remaining || 0,
+          used: current.used || 0,
+          freebiesReceived: (current.freebiesReceived || 0) + 1
+        };
+      });
     }
   } catch (e) {
     console.error("Hint write failed", e);
   }
 
-  // Check completion of a 3x3 box
-  maybeCelebrateBoxCompletion(r, c);
-
-  pushProgress(true);
   if (isSolved()) onSolved();
+}
+
+// Pick a uniformly random empty (non-given, non-locked) cell. Returns null if none.
+function pickRandomEmptyCell() {
+  const empties = [];
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const cell = State.cells[r][c];
+      if (!cell.given && !cell.locked) empties.push({ r, c });
+    }
+  }
+  if (empties.length === 0) return null;
+  return empties[Math.floor(Math.random() * empties.length)];
+}
+
+// Apply a hint reveal to a specific cell (used both for self-triggered and opponent-gifted reveals).
+function revealCellAsHint(r, c) {
+  const cell = State.cells[r][c];
+  if (cell.given || cell.locked) return;  // already revealed
+  const correct = State.solution[r][c];
+  cell.value = correct;
+  cell.locked = true;
+  cell.notes.clear();
+  clearInvalidatedNotes(r, c, correct);
+  renderBoard();
+  flashHint(r, c);
+  updateNumberPadCounts();
+  maybeCelebrateBoxCompletion(r, c);
+  pushProgress(true);
 }
 
 function maybeCelebrateBoxCompletion(r, c) {
@@ -3164,11 +3300,35 @@ async function forfeit() {
   setTimeout(() => leaveRoom(), 400);
 }
 
+// Lobby-phase leave. If we're the host, tear down the entire room so a guest
+// can't be left stranded with a "joinable" room code; if we're the guest, just
+// remove ourselves so the host can wait for someone else.
+async function leaveLobby() {
+  if (!State.roomCode || !CONFIGURED) {
+    leaveRoom();
+    return;
+  }
+  State._intentionallyLeaving = true;
+  cancelDisconnectHandlers();
+  try {
+    if (State.isCreator) {
+      // Host leaving wipes the whole room
+      await FB.remove(FB.ref(DB, `rooms/${State.roomCode}`));
+    } else {
+      // Guest just removes themselves
+      await FB.remove(FB.ref(DB, `rooms/${State.roomCode}/players/${State.playerId}`));
+    }
+  } catch (e) { /* not fatal */ }
+  leaveRoom();
+}
+
 function leaveRoom() {
   stopTimer();
   cancelDisconnectHandlers();
   if (State.unsubRoom) { State.unsubRoom(); State.unsubRoom = null; }
-  if (State.roomCode && CONFIGURED) {
+  // Note: do NOT delete the room here. That's leaveLobby's job (when called from the lobby).
+  // From the game screen, the cleanup is via forfeit() before this runs, or via onDisconnect.
+  if (State.roomCode && CONFIGURED && !State._intentionallyLeaving) {
     FB.remove(FB.ref(DB, `rooms/${State.roomCode}/players/${State.playerId}`)).catch(() => {});
   }
   State.roomCode = null;
@@ -3178,6 +3338,8 @@ function leaveRoom() {
   State._endSoundPlayed = false;
   State._warnedPids = new Set();
   State._resultRecorded = false;
+  State._gameStarted = false;
+  State._intentionallyLeaving = false;
   $("#end-modal-backdrop").classList.remove("active");
   showScreen("screen-home");
   renderRivalry();
@@ -3226,18 +3388,35 @@ function applyHighlights() {
     div.classList.remove("highlighted-region", "highlighted-number", "selected");
   });
 
-  if (!State.selected) return;
-  const { r: sr, c: sc } = State.selected;
-  const selectedValue = State.cells[sr][sc].value;
+  // Determine which number to highlight:
+  // 1. If the user explicitly tapped a number-pad button, use that.
+  // 2. Otherwise, use the value of the currently selected cell.
+  const highlightNum = State.highlightedNumber
+    || (State.selected ? State.cells[State.selected.r][State.selected.c].value : 0);
 
-  cells.forEach(div => {
-    const r = +div.dataset.row, c = +div.dataset.col;
-    const cell = State.cells[r][c];
-    // Highlight only the row and column of the selected cell — the 3x3 box is visually obvious from the grid structure
-    const inRegion = r === sr || c === sc;
-    if (inRegion) div.classList.add("highlighted-region");
-    if (selectedValue && cell.value === selectedValue) div.classList.add("highlighted-number");
-    if (r === sr && c === sc) div.classList.add("selected");
+  // Highlight matching numbers across the whole board (independent of selection)
+  if (highlightNum) {
+    cells.forEach(div => {
+      const r = +div.dataset.row, c = +div.dataset.col;
+      if (State.cells[r][c].value === highlightNum) {
+        div.classList.add("highlighted-number");
+      }
+    });
+  }
+
+  // Highlight the selected cell's row/column + the cell itself
+  if (State.selected) {
+    const { r: sr, c: sc } = State.selected;
+    cells.forEach(div => {
+      const r = +div.dataset.row, c = +div.dataset.col;
+      if (r === sr || c === sc) div.classList.add("highlighted-region");
+      if (r === sr && c === sc) div.classList.add("selected");
+    });
+  }
+
+  // Update which number-pad button looks "active"
+  $$(".num-btn").forEach(btn => {
+    btn.classList.toggle("num-active", parseInt(btn.dataset.num, 10) === highlightNum);
   });
 }
 
@@ -3246,6 +3425,9 @@ function selectCell(r, c) {
     Sound.select();
   }
   State.selected = { r, c };
+  // Clicking a cell takes precedence over a pinned number — clear the pin so
+  // the selected cell's value (if any) drives the highlight.
+  State.highlightedNumber = 0;
   applyHighlights();
 }
 
@@ -3275,10 +3457,25 @@ function renderNumberPad() {
     btn.className = "num-btn";
     btn.dataset.num = n;
     btn.innerHTML = `${n}<span class="remaining"></span>`;
-    btn.addEventListener("click", () => enterNumber(n));
+    btn.addEventListener("click", () => onNumPadClick(n));
     pad.appendChild(btn);
   }
   updateNumberPadCounts();
+}
+
+function onNumPadClick(n) {
+  // If a cell is selected and editable, place the number there (existing behavior).
+  // Either way, also light up all instances of that number on the board.
+  if (State.selected) {
+    const { r, c } = State.selected;
+    const cell = State.cells[r][c];
+    if (!cell.given && !cell.locked && !State.finishedAt) {
+      enterNumber(n);
+    }
+  }
+  // Toggle the highlight: tapping the same number twice clears it
+  State.highlightedNumber = (State.highlightedNumber === n) ? 0 : n;
+  applyHighlights();
 }
 
 function updateNumberPadCounts() {
@@ -3458,20 +3655,24 @@ function stopTimer() {
 function renderOpponentsStrip(room) {
   if (!room || !room.game) return;
 
-  // Detect opponent-gifted hints to me (new gifts since last render)
+  // Detect opponent-triggered freebies (new ones since last render).
+  // Each freebie => reveal a random empty cell on MY board, with toast + sound.
   const myHintData = room.game.hints && room.game.hints[State.playerId];
-  if (myHintData) {
-    const totalGiftsEverReceived = (myHintData.remainingGifted || 0) + (myHintData.usedGifted || 0);
-    if (totalGiftsEverReceived > State.lastSeenGiftReceivedTotal) {
-      const delta = totalGiftsEverReceived - State.lastSeenGiftReceivedTotal;
+  if (myHintData && !State.finishedAt) {
+    const freebiesTotal = myHintData.freebiesReceived || 0;
+    if (freebiesTotal > State.lastAcknowledgedFreebies) {
+      const delta = freebiesTotal - State.lastAcknowledgedFreebies;
       const oppIdLookup = Object.keys(room.players).find(pid => pid !== State.playerId);
       const oppName = (oppIdLookup && room.players[oppIdLookup] && room.players[oppIdLookup].name) || "Opponent";
-      toast(`${oppName} used a hint — you got ${delta === 1 ? "a free one" : delta + " free ones"}`, 2600);
+      // Reveal `delta` random empty cells on my board (almost always just 1).
+      for (let i = 0; i < delta; i++) {
+        const target = pickRandomEmptyCell();
+        if (!target) break;
+        revealCellAsHint(target.r, target.c);
+      }
       Sound.hintGift();
-      // Sync local gifted-remaining to authoritative value from DB
-      State.hintsRemainingGifted = myHintData.remainingGifted || 0;
-      State.lastSeenGiftReceivedTotal = totalGiftsEverReceived;
-      updateHintBadge();
+      toast(`${oppName} used a hint — you got ${delta === 1 ? "a free reveal" : delta + " free reveals"}`, 2600);
+      State.lastAcknowledgedFreebies = freebiesTotal;
       // Visual pulse on the hint button
       const btn = $("#btn-hint");
       if (btn) {
@@ -3479,6 +3680,8 @@ function renderOpponentsStrip(room) {
         void btn.offsetWidth;
         btn.classList.add("hint-pulse");
       }
+      // If the freebie solved the puzzle, end the game cleanly
+      if (isSolved()) onSolved();
     }
   }
 
@@ -3496,15 +3699,15 @@ function renderOpponentsStrip(room) {
     if (!p) continue;
     const isMe = pid === State.playerId;
     const progress = (room.game.progress && room.game.progress[pid]) || { filled: 0, mistakes: 0, time: 0 };
-    const hintData = (room.game.hints && room.game.hints[pid]) || { remainingOwn: 0, remainingGifted: 0, usedOwn: 0, usedGifted: 0 };
+    const hintData = (room.game.hints && room.game.hints[pid]) || { remaining: 0, used: 0, freebiesReceived: 0 };
     const liveTime = isMe ? getElapsedSec() : progress.time;
     const filledPct = Math.min(100, Math.round((progress.filled / 81) * 100));
     const cellsLeft = Math.max(0, 81 - (progress.filled || 0));
     const mistakeLimit = room.game.mistakeLimit;
     const mistakesDanger = mistakeLimit > 0 && progress.mistakes >= mistakeLimit - 1;
     const hintsEnabled = (room.game.hintsPerDuel ?? 0) > 0;
-    const hintsUsedTotal = (hintData.usedOwn || 0) + (hintData.usedGifted || 0);
-    const hintsLeftTotal = (hintData.remainingOwn || 0) + (hintData.remainingGifted || 0);
+    const hintsUsed = hintData.used || 0;
+    const hintsRemaining = hintData.remaining || 0;
 
     // Warning when opponent is closing in: cells left <= ~10% (i.e. 8 cells or fewer)
     // Only for the OTHER player, not yourself
@@ -3533,8 +3736,8 @@ function renderOpponentsStrip(room) {
         </span>
       </div>
       ${hintsEnabled ? `<div class="meta-row">
-        <span>${hintsUsedTotal} hint${hintsUsedTotal === 1 ? '' : 's'} used</span>
-        <span>${hintsLeftTotal} left</span>
+        <span>${hintsUsed} hint${hintsUsed === 1 ? '' : 's'} used</span>
+        <span>${hintsRemaining} left</span>
       </div>` : ''}
       <div class="progress-bar" style="width:${filledPct}%"></div>
     `;
@@ -3680,11 +3883,11 @@ function showEndModal(room) {
     if (!pid) continue;
     const f = room.game.finished[pid];
     const live = room.game.progress && room.game.progress[pid];
-    const hintData = (room.game.hints && room.game.hints[pid]) || { usedOwn: 0, usedGifted: 0 };
+    const hintData = (room.game.hints && room.game.hints[pid]) || { used: 0 };
     const winner = f && f.status === "won";
     const time = f ? f.time : (live ? live.time : 0);
     const mistakes = f ? f.mistakes : (live ? live.mistakes : 0);
-    const hintsUsed = (hintData.usedOwn || 0) + (hintData.usedGifted || 0);
+    const hintsUsed = hintData.used || 0;
     const hintsEnabled = (room.game.hintsPerDuel ?? 0) > 0;
     const statusText = f ? (f.status === "won" ? "Solved" : f.status === "lost" ? "Mistake-out" : f.status === "forfeit" ? "Forfeited" : "—") : "Did not finish";
     const detailBits = [statusText, `${mistakes} mistake${mistakes === 1 ? '' : 's'}`];
@@ -3725,8 +3928,19 @@ function bindModalEvents() {
     await FB.update(FB.ref(DB), updates);
     $("#end-modal-backdrop").classList.remove("active");
     showScreen("screen-lobby");
+    // We're back in the lobby — re-arm host/guest disconnect behavior accordingly
+    State._gameStarted = false;
+    refreshDisconnectHandlers(State.roomCode);
   });
-  $("#btn-home-from-end").addEventListener("click", leaveRoom);
+  $("#btn-home-from-end").addEventListener("click", () => {
+    // Clicking "Back to home" after the duel ends — also clean up the room (if we can)
+    // so leftover finished rooms don't accumulate.
+    State._intentionallyLeaving = true;
+    if (State.roomCode && CONFIGURED) {
+      FB.remove(FB.ref(DB, `rooms/${State.roomCode}`)).catch(() => {});
+    }
+    leaveRoom();
+  });
 }
 
 </script>
