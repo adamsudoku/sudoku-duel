@@ -2701,9 +2701,21 @@ function bindJoinEvents() {
 async function onJoinConfirm() {
   const code = $("#join-code").value.trim().toUpperCase();
   $("#join-error").style.display = "none";
+
+  // If we're not on the join screen (e.g. arrived via invite link), errors show as toasts
+  // because the user can't see #join-error inside the hidden join screen.
+  const onJoinScreen = $("#screen-join").classList.contains("active");
+  const showErr = (msg) => {
+    if (onJoinScreen) {
+      $("#join-error").textContent = msg;
+      $("#join-error").style.display = "block";
+    } else {
+      toast(msg, 3500);
+    }
+  };
+
   if (code.length !== 4) {
-    $("#join-error").textContent = "Codes are 4 letters.";
-    $("#join-error").style.display = "block";
+    showErr("Codes are 4 letters.");
     return;
   }
   if (!CONFIGURED) {
@@ -2713,52 +2725,48 @@ async function onJoinConfirm() {
 
   const roomRef = FB.ref(DB, `rooms/${code}`);
 
-  // Pre-flight read so we can give a friendly "no such room" error.
-  // (We can't fully rely on transactions for this because the first transaction
-  // attempt sometimes sees a stale null even when the room exists on the server.)
-  const preSnap = await FB.get(roomRef);
-  if (!preSnap.exists()) {
-    $("#join-error").textContent = "No room with that code.";
-    $("#join-error").style.display = "block";
+  // Read the room
+  let snap;
+  try {
+    snap = await FB.get(roomRef);
+  } catch (e) {
+    console.error("Room read failed:", e);
+    showErr("Couldn't reach server. Check your internet, then try again.");
+    return;
+  }
+  if (!snap.exists()) {
+    showErr("No room with that code.");
     return;
   }
 
-  // Use a transaction so we read & write atomically, preventing two people
-  // from both passing the "room not full" check and squeezing in as a third.
-  let joinError = null;
-  const result = await FB.runTransaction(roomRef, (room) => {
-    // If room comes back null here, that's almost always a stale cache — return undefined
-    // to let Firebase retry against the server, NOT to abort with "no room".
-    if (room === null) return;  // Firebase will retry with fresh server data
-    if (room.status === "ended") { joinError = "That duel has already ended."; return; }
-    if (room.status === "playing") { joinError = "That duel is already in progress."; return; }
-    const players = room.players || {};
-    const playerIds = Object.keys(players);
-    const alreadyIn = !!players[State.playerId];
-    if (!alreadyIn && playerIds.length >= 2) {
-      joinError = "Room is full.";
-      return;
-    }
-    // Safe to add ourselves
-    room.players = room.players || {};
-    room.players[State.playerId] = {
+  const room = snap.val();
+  if (room.status === "ended") {
+    showErr("That duel has already ended.");
+    return;
+  }
+  if (room.status === "playing") {
+    showErr("That duel is already in progress.");
+    return;
+  }
+  const players = room.players || {};
+  const playerIds = Object.keys(players);
+  const alreadyIn = !!players[State.playerId];
+  if (!alreadyIn && playerIds.length >= 2) {
+    showErr("Room is full.");
+    return;
+  }
+
+  // Add ourselves with a simple targeted update (no overwriting the whole room).
+  try {
+    await FB.update(FB.ref(DB, `rooms/${code}/players/${State.playerId}`), {
       name: State.playerName,
       ready: false,
       joinedAt: Date.now(),
       isCreator: false
-    };
-    return room;
-  });
-
-  if (joinError) {
-    $("#join-error").textContent = joinError;
-    $("#join-error").style.display = "block";
-    return;
-  }
-  if (!result || !result.committed) {
-    // Transaction failed without setting joinError — most likely a rules denial.
-    $("#join-error").textContent = "Couldn't join — try again, or ask the host to recreate the room.";
-    $("#join-error").style.display = "block";
+    });
+  } catch (e) {
+    console.error("Join write failed:", e);
+    showErr("Join failed: " + (e.message || e.code || "unknown"));
     return;
   }
 
