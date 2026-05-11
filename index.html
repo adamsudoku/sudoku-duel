@@ -3761,6 +3761,12 @@ function renderOpponentsStrip(room) {
     const freebiesTotal = myHintData.freebiesReceived || 0;
     if (freebiesTotal > State.lastAcknowledgedFreebies) {
       const delta = freebiesTotal - State.lastAcknowledgedFreebies;
+      dbgLog("FREEBIE detected", {
+        freebiesTotalFromDB: freebiesTotal,
+        lastAckBefore: State.lastAcknowledgedFreebies,
+        delta,
+        currentlyFilled: getFilledCount()
+      });
       // CRITICAL: update this BEFORE the reveal loop, because revealCellAsHint writes
       // to the DB, which re-fires this listener. If we updated after the loop, the
       // re-entrant call would see lastAcknowledgedFreebies still at the old value and
