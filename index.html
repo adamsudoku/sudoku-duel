@@ -678,6 +678,12 @@ input[type=range]::-moz-range-thumb {
 }
 .player-card.ready .status { color: var(--success); }
 
+.player-card.offline {
+  border-style: dashed;
+  opacity: 0.65;
+}
+.player-card.offline .status { color: var(--error); }
+
 .empty-slot {
   background: transparent;
   border: 1px dashed var(--line);
@@ -697,6 +703,167 @@ input[type=range]::-moz-range-thumb {
   margin: 8px 0 20px;
   font-style: italic;
 }
+
+/* ===== PRACTICE / COACH ===== */
+.coach-bar {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.coach-bar .btn { width: 100%; }
+.coach-text {
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  min-height: 2.6em;
+}
+.coach-text.muted { color: var(--ink-faint); font-style: italic; }
+
+.practice-strip {
+  background: var(--bg-elevated);
+  border: 1.5px dashed var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.practice-strip .practice-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.practice-strip .practice-title {
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+}
+.practice-strip .practice-count {
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.practice-strip .practice-note {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+/* The unit the coach is pointing at — its own tint, so it never reads as the
+   ordinary row/column highlight. */
+.cell.coach-unit {
+  background: var(--highlight);
+  background: color-mix(in srgb, var(--success) 16%, var(--bg-elevated));
+}
+.cell.coach-target {
+  box-shadow: inset 0 0 0 2px var(--success);
+  animation: coachPulse 1.2s ease 2;
+}
+@keyframes coachPulse {
+  0%, 100% { box-shadow: inset 0 0 0 2px var(--success); }
+  50% { box-shadow: inset 0 0 0 4px var(--success); }
+}
+
+/* ===== SOLO ===== */
+.pause-btn {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 12px;
+  background: var(--bg-elevated);
+  transition: all 0.15s ease;
+}
+.pause-btn:hover { border-color: var(--ink-faint); color: var(--ink); }
+
+.pause-veil {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  z-index: 5;
+}
+.pause-veil.show { display: flex; }
+.pause-veil-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.pause-title {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
+}
+.pause-veil .btn { min-width: 160px; }
+
+.opponents-strip.solo { grid-template-columns: 1fr; }
+
+.solo-strip {
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--accent-soft);
+  border-radius: 14px;
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.solo-strip .solo-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.solo-strip .solo-level {
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+.solo-strip .solo-timer {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+}
+.solo-strip .solo-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.solo-strip .solo-meta > span { white-space: nowrap; }
+.solo-strip .solo-meta + .solo-meta { margin-top: 3px; }
+.solo-strip .solo-meta .danger { color: var(--error); font-weight: 600; }
+
+.best-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.best-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+.best-row:last-child { border-bottom: none; }
+.best-row .best-level { font-weight: 600; color: var(--ink-soft); }
+.best-row .best-time {
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.best-row .best-time.none { color: var(--ink-faint); font-family: inherit; font-size: 13px; font-style: italic; }
 
 .theme-grid {
   display: grid;
@@ -943,6 +1110,7 @@ input[type=range]::-moz-range-thumb {
   padding: 12px;
   box-shadow: var(--shadow-soft);
   margin-bottom: 18px;
+  position: relative;   /* the pause veil sits over the board */
 }
 
 .board {
@@ -1229,6 +1397,9 @@ input[type=range]::-moz-range-thumb {
   margin-bottom: 28px;
   text-align: left;
 }
+/* Solo shows three cards rather than two players. */
+.result-stats.solo { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.result-stats.solo .stat-card { padding: 12px 10px; }
 
 .stat-card {
   background: var(--bg);
@@ -1447,8 +1618,65 @@ input[type=range]::-moz-range-thumb {
     <div class="home-actions">
       <button class="btn btn-primary" id="btn-create">Create new duel</button>
       <button class="btn btn-secondary" id="btn-join-open">Join with code</button>
+      <button class="btn btn-secondary" id="btn-solo-open" style="display:none;">Play solo</button>
+      <button class="btn btn-accent" id="btn-solo-resume" style="display:none;">Resume solo puzzle</button>
     </div>
 
+  </section>
+
+  <!-- ============ SOLO SETUP SCREEN ============ -->
+  <section id="screen-solo" class="screen">
+    <div class="section-head">
+      <h2>Play solo</h2>
+      <button class="btn-ghost" id="btn-solo-back">← Back</button>
+    </div>
+
+    <div class="settings-block">
+      <h3>Difficulty</h3>
+      <div class="difficulty-grid" id="solo-difficulty-grid">
+        <button class="diff-btn" data-diff="easy">Easy</button>
+        <button class="diff-btn" data-diff="medium">Medium</button>
+        <button class="diff-btn" data-diff="hard">Hard</button>
+        <button class="diff-btn" data-diff="expert">Expert</button>
+      </div>
+      <div class="slider-row">
+        <span class="clues-value" id="solo-clues-value">30</span>
+        <input type="range" id="solo-clues-slider" min="20" max="50" value="30" />
+        <span class="slider-label">clues</span>
+      </div>
+      <p class="level-note" id="solo-level-note"></p>
+    </div>
+
+    <div class="settings-block">
+      <h3>Mistake limit</h3>
+      <div class="slider-row">
+        <span class="clues-value" id="solo-mistakes-value">Off</span>
+        <input type="range" id="solo-mistakes-slider" min="0" max="10" value="0" />
+        <span class="slider-label" id="solo-mistakes-label">no limit</span>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Hints</h3>
+      <div class="slider-row">
+        <span class="clues-value" id="solo-hints-value">3</span>
+        <input type="range" id="solo-hints-slider" min="0" max="10" value="3" />
+        <span class="slider-label" id="solo-hints-label">hints</span>
+      </div>
+      <p style="font-size:11px; color:var(--ink-faint); margin-top:10px; line-height:1.5; font-style:italic;">
+        A solve that uses no hints sets your best time. Hinted solves don't count for records.
+      </p>
+    </div>
+
+    <div class="settings-block">
+      <h3>Your best times</h3>
+      <div class="best-list" id="solo-best-list"></div>
+    </div>
+
+    <div class="home-actions">
+      <button class="btn btn-primary" id="btn-solo-start">Start puzzle</button>
+    </div>
+    <p class="muted-note" id="solo-resume-note" style="display:none;"></p>
   </section>
 
   <!-- ============ SETTINGS SCREEN ============ -->
@@ -1653,6 +1881,7 @@ input[type=range]::-moz-range-thumb {
     <div class="game-header">
       <button class="leave" id="btn-leave-game">← Leave</button>
       <div style="display:flex; align-items:center; gap:14px;">
+        <button class="pause-btn" id="btn-pause" style="display:none;">Pause</button>
         <button class="sound-toggle" id="btn-sound-toggle" aria-label="Toggle sound" title="Toggle sound">
           <svg id="icon-sound-on" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
           <svg id="icon-sound-off" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
@@ -1667,9 +1896,20 @@ input[type=range]::-moz-range-thumb {
 
     <div class="board-wrap">
       <div class="board" id="board"></div>
+      <div class="pause-veil" id="pause-veil">
+        <div class="pause-veil-inner">
+          <span class="pause-title">Paused</span>
+          <button class="btn btn-accent" id="btn-resume">Resume</button>
+        </div>
+      </div>
     </div>
 
     <div class="num-pad" id="num-pad"></div>
+
+    <div class="coach-bar" id="coach-bar" style="display:none;">
+      <button class="btn btn-accent" id="btn-coach">Show me the next move</button>
+      <p class="coach-text" id="coach-text">Take as long as you like. Nothing here is recorded.</p>
+    </div>
 
     <div class="tool-row" id="tool-row">
       <button class="tool-btn" id="btn-erase">
@@ -1700,6 +1940,7 @@ input[type=range]::-moz-range-thumb {
 
     <div class="modal-actions">
       <button class="btn btn-accent" id="btn-rematch">Rematch</button>
+      <button class="btn btn-secondary" id="btn-practice">Finish the puzzle</button>
       <button class="btn btn-secondary" id="btn-home-from-end">Back to home</button>
     </div>
   </div>
@@ -1942,7 +2183,12 @@ function tNakedSingle(st) {
   for (let i = 0; i < 81; i++) {
     if (st.val[i] || popcount(st.cand[i]) !== 1) continue;
     const d = lowIndex(st.cand[i]) + 1;
-    return { place: { i, d }, why: `${rcName(i)} can only be ${d} — every other digit already appears in its row, column or box.` };
+    return {
+      place: { i, d },
+      unit: { kind: "box", k: BOX_OF[i] },
+      teaser: `Somewhere in box ${BOX_OF[i] + 1} there's a square with only one digit left that fits.`,
+      why: `${rcName(i)} can only be ${d} — every other digit already appears in its row, column or box.`
+    };
   }
   return null;
 }
@@ -1956,7 +2202,12 @@ function tHiddenSingle(st) {
         if (st.cand[i] & bit) { n++; spot = i; }
       }
       if (!taken && n === 1) {
-        return { place: { i: spot, d: d + 1 }, why: `${unitName(u)} has only one square left that can hold a ${d + 1}: ${rcName(spot)}.` };
+        return {
+          place: { i: spot, d: d + 1 },
+          unit: { kind: u.kind, k: u.k },
+          teaser: `${unitName(u).charAt(0).toUpperCase() + unitName(u).slice(1)} can only take its ${d + 1} in one place. Which square?`,
+          why: `${unitName(u)} has only one square left that can hold a ${d + 1}: ${rcName(spot)}.`
+        };
       }
     }
   }
@@ -2161,7 +2412,14 @@ function nextPlacement(cellsIn) {
     const r = nextStep(st);
     if (!r) return null;
     if (r.step.place) {
-      return { i: r.step.place.i, d: r.step.place.d, why: r.step.why, technique: TECHNIQUES[r.techIndex].name };
+      return {
+        i: r.step.place.i,
+        d: r.step.place.d,
+        why: r.step.why,
+        teaser: r.step.teaser || r.step.why,
+        unit: r.step.unit || null,
+        technique: TECHNIQUES[r.techIndex].name
+      };
     }
     applyStep(st, r.step);
   }
@@ -2358,14 +2616,31 @@ let FB = null;       // firebase namespace
 let DB = null;       // database instance
 let CONFIGURED = false;
 
+let __bootAttempts = 0;
+let __booted = false;
+
 function bootstrap() {
+  if (__booted) return;
   if (window.__dlog) window.__dlog('bootstrap() called');
   FB = window.__firebase;
   if (!FB) {
+    // Solo play needs no network, so we don't wait on Firebase forever. After
+    // about four seconds we start anyway: duels will say they can't connect,
+    // and the rest of the app works — including a whole solo game offline.
+    if (++__bootAttempts > 80) {
+      if (window.__dlog) window.__dlog('Firebase never arrived — starting in offline mode', true);
+      __booted = true;
+      init();
+      toast(soloEnabled()
+        ? "Offline — solo play works, duels need a connection"
+        : "No connection — duels need one to start", 5000);
+      return;
+    }
     if (window.__dlog) window.__dlog('FB not ready yet, retrying in 50ms');
     setTimeout(bootstrap, 50);
     return;
   }
+  __booted = true;
   if (window.__dlog) window.__dlog('FB namespace acquired. config apiKey: ' + (FB.config.apiKey === 'REPLACE_ME' ? 'REPLACE_ME (not configured!)' : 'looks set'));
   if (FB.config.apiKey !== "REPLACE_ME") {
     try {
@@ -2389,9 +2664,11 @@ window.__onFirebaseReady = bootstrap;
 
 // Also try right now in case the module already finished loading before we got here
 if (window.__dlog) window.__dlog('Non-module script reached end. firebaseReady=' + !!window.__firebaseReady);
-if (window.__firebaseReady) {
-  bootstrap();
-}
+// Start the boot loop regardless. If the Firebase module never loads — no
+// network, a blocked CDN, an over-eager blocker — the callback above never
+// fires, and without this the app would sit there dead forever instead of
+// falling back to offline mode after a few seconds.
+bootstrap();
 
 /* ---------- Utilities ---------- */
 const $ = (sel) => document.querySelector(sel);
@@ -2460,6 +2737,21 @@ const State = {
   unsubRoom: null,
   unsubMyPresence: null,
 
+  // Practice (finishing a duel puzzle after it ended)
+  practice: false,
+  practiceReview: false,
+  practiceSolved: false,
+  coachStep: null,
+  coachStage: 0,
+
+  // Solo play
+  solo: false,
+  soloConfig: null,
+  soloPuzzleStr: null,
+  soloHardest: "",
+  soloPausedAt: null,
+  pausedTotalMs: 0,
+
   // Connection / presence
   connected: true,          // are we talking to Firebase right now
   serverOffset: 0,          // server clock minus our clock, in ms
@@ -2467,6 +2759,7 @@ const State = {
   unsubOffset: null,
   bannerTicker: null,
   _forfeitClaimFor: null,   // opponent id we have already timed out, so we claim once
+  _lobbyEvictFor: null,     // and the same, for freeing a seat in the lobby
 };
 
 /* ============================================================
@@ -2739,7 +3032,7 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 function init() {
-  if (window.__dlog) window.__dlog('init() running — binding event handlers');
+  if (window.__dlog) window.__dlog('init() running — binding event handlers. CONFIGURED=' + CONFIGURED);
   // Restore player name
   const savedName = localStorage.getItem("sd_name");
   if (savedName) {
@@ -2747,8 +3040,7 @@ function init() {
     State.playerName = savedName;
   }
 
-  applyTheme(currentThemeId());
-  buildThemePicker();
+  bindOfflineCapableUI();
 
   bindHomeEvents();
   bindJoinEvents();
@@ -3487,27 +3779,38 @@ async function onJoinConfirm() {
     showErr("That duel is already in progress.");
     return;
   }
-  const players = room.players || {};
-  const playerIds = Object.keys(players);
-  const alreadyIn = !!players[State.playerId];
-  if (!alreadyIn && playerIds.length >= 2) {
-    showErr("Room is full.");
-    return;
-  }
-
-  // Add ourselves with a simple targeted update (no overwriting the whole room).
+  // Claim a seat in one atomic step. Two people entering the same code at the
+  // same moment used to both read "one player" and both write, making three.
+  // The same pass drops anyone who has been gone longer than the grace period,
+  // so a room somebody abandoned by closing their tab isn't full forever.
+  let committed = false;
   try {
-    await FB.update(FB.ref(DB, `rooms/${code}/players/${State.playerId}`), {
-      name: State.playerName,
-      ready: false,
-      joinedAt: Date.now(),
-      isCreator: false,
-      online: true,
-      offlineAt: null
+    const res = await FB.runTransaction(FB.ref(DB, `rooms/${code}/players`), (current) => {
+      const players = current || {};
+      for (const pid of Object.keys(players)) {
+        if (pid === State.playerId) continue;
+        const pl = players[pid];
+        const goneFor = pl && pl.online === false && pl.offlineAt ? serverNow() - pl.offlineAt : 0;
+        if (goneFor > OFFLINE_GRACE_MS) delete players[pid];
+      }
+      if (!players[State.playerId] && Object.keys(players).length >= 2) return;   // full: abort
+      players[State.playerId] = {
+        name: State.playerName,
+        ready: false,
+        joinedAt: Date.now(),
+        isCreator: false,
+        online: true
+      };
+      return players;
     });
+    committed = res && res.committed;
   } catch (e) {
     console.error("Join write failed:", e);
     showErr("Join failed: " + (e.message || e.code || "unknown"));
+    return;
+  }
+  if (!committed) {
+    showErr("Room is full.");
     return;
   }
 
@@ -3542,6 +3845,7 @@ function attachRoom(code) {
     onRoomUpdate(State.room);
     renderConnectionBanner();
     checkOpponentPresence(State.room);
+    checkLobbyPresence(State.room);
   });
   State.unsubRoom = () => FB.off(roomRef, "value", cb);
 
@@ -3549,6 +3853,664 @@ function attachRoom(code) {
   // We attach the player-remove handler now; the host-tears-down-room handler is set up dynamically
   // because the game-vs-lobby distinction matters: once the game starts, we want a forfeit, not a deletion.
   refreshDisconnectHandlers(code);
+}
+
+/* ============================================================
+   PRACTICE MODE
+
+   A duel that ended before you finished leaves an unsolved board and no
+   way back to it. Practice hands it back: the same puzzle, the clock off,
+   nothing written anywhere, and a coach that will walk you through the
+   next move if you ask twice. Nothing here is recorded, so a puzzle you
+   lost is still a puzzle you can learn from.
+   ============================================================ */
+
+function enterPractice() {
+  if (!State.room || !State.room.game || !State.cells) return;
+  const alreadyDone = isSolved();
+  State.practice = true;
+  State.practiceReview = alreadyDone;   // nothing to finish, just looking
+  State.finishedAt = null;      // the board accepts entries again
+  State.coachStep = null;
+  State.coachStage = 0;
+  State.practiceSolved = alreadyDone;
+  stopTimer();
+  cancelDisconnectHandlers();
+
+  $("#end-modal-backdrop").classList.remove("active");
+  $("#coach-bar").style.display = "";
+  $("#btn-hint").style.display = "none";        // the coach replaces hints here
+  $("#tool-row").classList.add("no-hints");
+  $("#btn-leave-game").textContent = "← Done";
+  $("#btn-pause").style.display = "none";
+  $("#btn-coach").style.display = alreadyDone ? "none" : "";
+  setCoachText(alreadyDone
+    ? "The finished grid. Look around as long as you like — nothing here changes the result."
+    : "Take as long as you like. Nothing here is recorded.", true);
+  $("#btn-coach").textContent = "Show me the next move";
+  renderPracticeStrip();
+  clearCoachMarks();
+  showScreen("screen-game");
+}
+
+function exitPractice() {
+  State.practice = false;
+  State.practiceReview = false;
+  $("#btn-coach").style.display = "";
+  State.coachStep = null;
+  State.coachStage = 0;
+  State.finishedAt = Date.now();
+  clearCoachMarks();
+  $("#coach-bar").style.display = "none";
+  $("#btn-leave-game").textContent = "← Leave";
+  const hintsEnabled = State.room && State.room.game && (State.room.game.hintsPerDuel ?? 0) > 0;
+  $("#btn-hint").style.display = hintsEnabled ? "" : "none";
+  $("#tool-row").classList.toggle("no-hints", !hintsEnabled);
+  // Re-sync with whatever happened in the room while we were practising. The
+  // opponent may have hit Rematch, which resets the room to the lobby — in
+  // that case we belong on the lobby screen, not staring at a dead board.
+  if (State.solo || !State.room) {
+    $("#end-modal-backdrop").classList.add("active");
+    return;
+  }
+  // enterPractice cancelled our offline marker; coming back out we need it
+  // again, or a later drop would leave us looking present but idle forever.
+  if (State.roomCode) refreshDisconnectHandlers(State.roomCode);
+  if (State.room.status === "lobby") {
+    showScreen("screen-lobby");
+    renderLobby(State.room);
+    toast("Your rival started a rematch", 2800);
+    return;
+  }
+  onRoomUpdate(State.room);
+  $("#end-modal-backdrop").classList.add("active");
+}
+
+function renderPracticeStrip() {
+  const strip = $("#opponents-strip");
+  if (!strip || !State.practice) return;
+  strip.classList.remove("solo");
+  const left = Math.max(0, 81 - getFilledCount());
+  const title = State.practiceReview ? "The finished board"
+    : State.practiceSolved ? "Finished it"
+    : "Practice";
+  const note = State.practiceReview ? "Your completed grid, for looking over together."
+    : State.practiceSolved ? "Solved after the duel — just for you."
+    : "No clock, no mistakes counted, nothing recorded.";
+  strip.innerHTML = `
+    <div class="practice-strip">
+      <div class="practice-top">
+        <span class="practice-title">${title}</span>
+        <span class="practice-count">${State.practiceReview ? "all 81 filled" : `${left} ${left === 1 ? "cell" : "cells"} left`}</span>
+      </div>
+      <div class="practice-note">${note}</div>
+    </div>`;
+}
+
+function setCoachText(msg, muted) {
+  const el = $("#coach-text");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle("muted", !!muted);
+}
+
+function clearCoachMarks() {
+  $$("#board .cell").forEach(d => d.classList.remove("coach-unit", "coach-target"));
+}
+
+function markCoachUnit(unit) {
+  clearCoachMarks();
+  if (!unit) return;
+  $$("#board .cell").forEach(d => {
+    const r = +d.dataset.row, c = +d.dataset.col;
+    const inUnit = unit.kind === "row" ? r === unit.k
+      : unit.kind === "col" ? c === unit.k
+      : (((r / 3) | 0) * 3 + ((c / 3) | 0)) === unit.k;
+    if (inUnit) d.classList.add("coach-unit");
+  });
+}
+
+/* Ask once and it tells you what to look for. Ask again and it points at the
+   square — but you still put the number in yourself. */
+function onCoach() {
+  if (!State.practice) return;
+  if (isSolved()) {
+    setCoachText("Board's finished. Nothing left to point at.", true);
+    return;
+  }
+
+  if (State.coachStage === 0 || !State.coachStep) {
+    const flat = new Int8Array(81);
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+      const cell = State.cells[r][c];
+      if (!cell.value) continue;
+      if (cell.given || cell.locked || cell.value === State.solution[r][c]) flat[r * 9 + c] = cell.value;
+    }
+    let step = null;
+    try { step = SudokuEngine.nextPlacement(flat); } catch (e) { console.error("Coach failed", e); }
+    if (!step) {
+      setCoachText("Nothing here follows from the techniques I know — this one needs a leap. Fill in any square you're sure of and ask me again.", true);
+      return;
+    }
+    State.coachStep = step;
+    State.coachStage = 1;
+    // Clear whatever was highlighted before, so the only thing lit is the
+    // unit we're pointing at.
+    State.selected = null;
+    State.highlightedNumber = 0;
+    applyHighlights();
+    markCoachUnit(step.unit);
+    setCoachText(step.teaser, false);
+    $("#btn-coach").textContent = "I still can't see it";
+    Sound.select();
+    return;
+  }
+
+  // Stage two: name the square and the reason, select it, and let them type it.
+  const step = State.coachStep;
+  const r = (step.i / 9) | 0, c = step.i % 9;
+  markCoachUnit(step.unit);
+  const div = $(`#board .cell[data-row="${r}"][data-col="${c}"]`);
+  if (div) div.classList.add("coach-target");
+  State.selected = { r, c };
+  applyHighlights();
+  if (div) div.classList.add("coach-target");
+  setCoachText(`${step.why} It's the square outlined in green — put it in yourself.`, false);
+  $("#btn-coach").textContent = "Show me the next move";
+  State.coachStage = 0;
+  State.coachStep = null;
+}
+
+/* ============================================================
+   SOLO PLAY
+
+   Solo reuses the whole game screen. Rather than special-casing every
+   render, it builds the same room object the duel code expects and keeps
+   it in memory, so the board, number pad, hints and end modal all work
+   unchanged. What solo skips is Firebase: no writes, no presence, no
+   opponent. It therefore also works with no connection at all.
+   ============================================================ */
+
+/* Solo play is off until someone turns it on, and the switch is not on any
+   screen: tap the title on the home screen seven times. It is remembered per
+   browser, so turning it on here leaves everyone else's copy alone.
+   ?solo=1 in the URL does the same thing, and ?solo=0 turns it back off. */
+const SOLO_ENABLED_KEY = "sd_solo_enabled";
+const SOLO_TAPS_NEEDED = 7;
+
+function soloEnabled() {
+  try { return localStorage.getItem(SOLO_ENABLED_KEY) === "1"; } catch (e) { return false; }
+}
+function setSoloEnabled(on) {
+  try {
+    if (on) localStorage.setItem(SOLO_ENABLED_KEY, "1");
+    else localStorage.removeItem(SOLO_ENABLED_KEY);
+  } catch (e) { /* private mode */ }
+  applySoloVisibility();
+}
+function applySoloVisibility() {
+  const on = soloEnabled();
+  const open = $("#btn-solo-open");
+  if (open) open.style.display = on ? "" : "none";
+  refreshSoloEntryPoints();
+}
+
+function bindSoloUnlock() {
+  const title = document.querySelector("#screen-home .brand h1");
+  if (!title) return;
+  title.style.cursor = "default";
+  let taps = 0, timer = null;
+  title.addEventListener("click", () => {
+    taps++;
+    clearTimeout(timer);
+    timer = setTimeout(() => { taps = 0; }, 2500);
+    if (taps < SOLO_TAPS_NEEDED) return;
+    taps = 0;
+    const on = !soloEnabled();
+    setSoloEnabled(on);
+    Sound.ready();
+    toast(on ? "Solo play unlocked" : "Solo play hidden again", 2600);
+  });
+}
+
+const SOLO_GAME_KEY = "sd_solo_game";
+const SOLO_BEST_KEY = "sd_solo_best";
+const SOLO_SETTINGS_KEY = "sd_solo_settings";
+
+function lsGet(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) { return fallback; }
+}
+function lsSet(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* private mode */ }
+}
+function lsDel(key) {
+  try { localStorage.removeItem(key); } catch (e) { /* private mode */ }
+}
+
+function soloSettings() {
+  const d = lsGet(SOLO_SETTINGS_KEY, {});
+  const difficulty = SudokuEngine.LEVELS[d.difficulty] ? d.difficulty : "medium";
+  return {
+    difficulty,
+    clues: SudokuEngine.cluesForLevel(difficulty, d.clues),
+    mistakeLimit: Number.isInteger(d.mistakeLimit) ? d.mistakeLimit : 0,
+    hintsPerDuel: Number.isInteger(d.hintsPerDuel) ? d.hintsPerDuel : 3
+  };
+}
+function saveSoloSettings(patch) {
+  lsSet(SOLO_SETTINGS_KEY, Object.assign(soloSettings(), patch));
+}
+
+/* ---------- best times ---------- */
+function soloBests() { return lsGet(SOLO_BEST_KEY, {}); }
+
+/** Records a best only for a solve with no hints — otherwise the record
+    means "how many hints did I spend", which is not a record. */
+function maybeRecordBest(level, seconds, hintsUsed, clues) {
+  if (hintsUsed > 0) return false;
+  const bests = soloBests();
+  const prev = bests[level];
+  if (prev && prev.seconds <= seconds) return false;
+  bests[level] = { seconds, clues, at: Date.now() };
+  lsSet(SOLO_BEST_KEY, bests);
+  return true;
+}
+
+function renderBestList() {
+  const list = $("#solo-best-list");
+  if (!list) return;
+  const bests = soloBests();
+  list.innerHTML = "";
+  SudokuEngine.LEVEL_ORDER.forEach(level => {
+    const row = document.createElement("div");
+    row.className = "best-row";
+    const name = document.createElement("span");
+    name.className = "best-level";
+    name.textContent = level.charAt(0).toUpperCase() + level.slice(1);
+    const time = document.createElement("span");
+    const b = bests[level];
+    if (b) {
+      time.className = "best-time";
+      time.textContent = `${fmtTime(b.seconds)}  ·  ${b.clues} clues`;
+    } else {
+      time.className = "best-time none";
+      time.textContent = "no hint-free solve yet";
+    }
+    row.appendChild(name);
+    row.appendChild(time);
+    list.appendChild(row);
+  });
+}
+
+/* ---------- saving an unfinished puzzle ---------- */
+function notesMask(set) {
+  let m = 0;
+  set.forEach(n => { m |= 1 << (n - 1); });
+  return m;
+}
+function maskToNotes(m) {
+  const set = new Set();
+  for (let n = 1; n <= 9; n++) if (m & (1 << (n - 1))) set.add(n);
+  return set;
+}
+
+function hasSoloSave() {
+  const g = lsGet(SOLO_GAME_KEY, null);
+  if (!g || g.v !== 1 || typeof g.puzzle !== "string" || g.puzzle.length !== 81) return false;
+  // A grid that no longer solves would be silently swapped for a different
+  // puzzle on resume, with the old answers locked onto it — unwinnable. Throw
+  // it away instead.
+  try {
+    if (!SudokuEngine.solvePuzzle(SudokuEngine.stringToGrid(g.puzzle))) {
+      lsDel(SOLO_GAME_KEY);
+      return false;
+    }
+  } catch (e) { lsDel(SOLO_GAME_KEY); return false; }
+  return true;
+}
+
+function saveSoloGame() {
+  if (!State.solo || State.practice || !State.cells || State.finishedAt) return;
+  const values = [], notes = [], wrong = [];
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    const cell = State.cells[r][c];
+    values.push(cell.value || 0);
+    notes.push(notesMask(cell.notes));
+    wrong.push(cell.wrongTried ? notesMask(cell.wrongTried) : 0);
+  }
+  lsSet(SOLO_GAME_KEY, {
+    v: 1,
+    puzzle: State.soloPuzzleStr,
+    values: values.join(""),
+    notes, wrong,
+    mistakes: State.mistakes,
+    hintsRemaining: State.hintsRemaining,
+    hintsUsed: State.hintsUsed,
+    elapsedMs: getElapsedMs(),
+    settings: State.soloConfig,
+    hardest: State.soloHardest || "",
+    savedAt: Date.now()
+  });
+}
+
+/** Board changed: refresh the strip and remember where we are. */
+function soloTouch() {
+  if (!State.solo || State.practice) return;   // practice records nothing
+  renderSoloStrip();
+  clearTimeout(window.__soloSaveTm);
+  window.__soloSaveTm = setTimeout(saveSoloGame, 300);
+}
+
+function clearSoloSave() {
+  // Drop any save that was already queued, or it lands a moment later and
+  // resurrects the game we just finished.
+  clearTimeout(window.__soloSaveTm);
+  lsDel(SOLO_GAME_KEY);
+  refreshSoloEntryPoints();
+}
+
+function refreshSoloEntryPoints() {
+  const btn = $("#btn-solo-resume");
+  const note = $("#solo-resume-note");
+  const saved = lsGet(SOLO_GAME_KEY, null);
+  const ok = hasSoloSave() && soloEnabled();
+  if (btn) btn.style.display = ok ? "" : "none";
+  if (note) {
+    note.style.display = ok ? "" : "none";
+    if (ok) {
+      const lvl = (saved.settings && saved.settings.difficulty) || "medium";
+      note.textContent = `Starting a new puzzle discards your saved ${lvl} game (${fmtTime(Math.floor((saved.elapsedMs || 0) / 1000))} in).`;
+    }
+  }
+}
+
+/* ---------- the clock, which solo can pause ---------- */
+function getElapsedMs() {
+  if (!State.startedAtMs) return 0;
+  const end = State.finishedAt || State.soloPausedAt || Date.now();
+  return Math.max(0, end - State.startedAtMs - (State.pausedTotalMs || 0));
+}
+
+function pauseSolo() {
+  if (!State.solo || State.soloPausedAt || State.finishedAt) return;
+  State.soloPausedAt = Date.now();
+  $("#pause-veil").classList.add("show");
+  $("#btn-pause").textContent = "Paused";
+  saveSoloGame();
+  renderSoloStrip();
+}
+function resumeSolo() {
+  if (!State.solo || !State.soloPausedAt) return;
+  State.pausedTotalMs = (State.pausedTotalMs || 0) + (Date.now() - State.soloPausedAt);
+  State.soloPausedAt = null;
+  $("#pause-veil").classList.remove("show");
+  $("#btn-pause").textContent = "Pause";
+  renderSoloStrip();
+}
+
+/* ---------- the single stat card that replaces the opponents strip ---------- */
+function renderSoloStrip() {
+  const strip = $("#opponents-strip");
+  if (!strip || !State.solo || !State.room) return;
+  strip.classList.add("solo");
+  const g = State.room.game;
+  const cellsLeft = Math.max(0, 81 - getFilledCount());
+  const level = (g.difficulty || "medium");
+  const levelName = level.charAt(0).toUpperCase() + level.slice(1);
+  const limit = g.mistakeLimit || 0;
+  const danger = limit > 0 && State.mistakes >= limit - 1;
+  const hintsOn = (g.hintsPerDuel ?? 0) > 0;
+  strip.innerHTML = `
+    <div class="solo-strip">
+      <div class="solo-top">
+        <span class="solo-level">${levelName} · ${g.clues} clues</span>
+        <span class="solo-timer">${fmtTime(Math.floor(getElapsedMs() / 1000))}</span>
+      </div>
+      <div class="solo-meta">
+        <span>${cellsLeft} ${cellsLeft === 1 ? "cell" : "cells"} left</span>
+        <span class="${danger ? "danger" : ""}">${limit > 0 ? `${State.mistakes}/${limit} mistakes` : `${State.mistakes} mistake${State.mistakes === 1 ? "" : "s"}`}</span>
+      </div>
+      ${hintsOn ? `<div class="solo-meta">
+        <span>${State.hintsUsed} hint${State.hintsUsed === 1 ? "" : "s"} used</span>
+        <span>${State.hintsRemaining} left</span>
+      </div>` : ""}
+    </div>`;
+}
+
+/* ---------- starting and finishing ---------- */
+function makeSoloRoom(puzzleStr, cfg, extra) {
+  return {
+    code: null,
+    status: "playing",
+    solo: true,
+    players: { [State.playerId]: { name: State.playerName || "You", online: true } },
+    game: {
+      seed: "solo",
+      puzzle: puzzleStr,
+      clues: (extra && extra.clues) || puzzleStr.split("").filter(ch => ch !== "0").length,
+      difficulty: cfg.difficulty,
+      hardest: (extra && extra.hardest) || "",
+      mistakeLimit: cfg.mistakeLimit,
+      hintsPerDuel: cfg.hintsPerDuel,
+      startedAt: Date.now(),
+      progress: { [State.playerId]: { filled: 0, mistakes: 0, time: 0 } },
+      finished: {},
+      hints: { [State.playerId]: { remaining: cfg.hintsPerDuel, used: 0, freebiesReceived: 0 } }
+    }
+  };
+}
+
+async function startSolo() {
+  const cfg = soloSettings();
+  const btn = $("#btn-solo-start");
+  const label = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Building the puzzle…"; }
+  let built;
+  try {
+    built = await Pregen.generate({ difficulty: cfg.difficulty, clues: cfg.clues });
+  } catch (e) {
+    console.error("Solo generation failed", e);
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+    toast("Couldn't build a puzzle — try again", 3500);
+    return;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = label; }
+  clearSoloSave();
+  enterSolo(makeSoloRoom(built.puzzle, cfg, { clues: built.clues, hardest: built.hardest }), null);
+}
+
+function resumeSoloGame() {
+  const saved = lsGet(SOLO_GAME_KEY, null);
+  if (!hasSoloSave()) { toast("No saved puzzle"); return; }
+  const cfg = Object.assign(soloSettings(), saved.settings || {});
+  const room = makeSoloRoom(saved.puzzle, cfg, { hardest: saved.hardest });
+  enterSolo(room, saved);
+}
+
+function enterSolo(room, saved) {
+  State.solo = true;
+  State.roomCode = null;
+  State.isCreator = false;
+  State.soloConfig = {
+    difficulty: room.game.difficulty,
+    clues: room.game.clues,
+    mistakeLimit: room.game.mistakeLimit,
+    hintsPerDuel: room.game.hintsPerDuel
+  };
+  State.soloPuzzleStr = room.game.puzzle;
+  State.soloHardest = room.game.hardest || "";
+  State.soloPausedAt = null;
+  State.pausedTotalMs = 0;
+  State.room = room;
+
+  startGameFromRoom(room);
+
+  if (saved) {
+    // Put the board back exactly as it was left.
+    for (let i = 0; i < 81; i++) {
+      const r = (i / 9) | 0, c = i % 9;
+      const cell = State.cells[r][c];
+      const v = parseInt(saved.values[i], 10) || 0;
+      if (!cell.given && v) { cell.value = v; cell.locked = true; }
+      cell.notes = maskToNotes((saved.notes && saved.notes[i]) || 0);
+      const w = (saved.wrong && saved.wrong[i]) || 0;
+      if (w) cell.wrongTried = maskToNotes(w);
+    }
+    State.mistakes = saved.mistakes || 0;
+    State.hintsRemaining = saved.hintsRemaining ?? room.game.hintsPerDuel;
+    State.hintsUsed = saved.hintsUsed || 0;
+    State.startedAtMs = Date.now() - (saved.elapsedMs || 0);
+    renderBoard();
+    updateNumberPadCounts();
+    updateHintBadge();
+  }
+
+  $("#btn-pause").style.display = "";
+  $("#pause-veil").classList.remove("show");
+  $("#btn-pause").textContent = "Pause";
+  $("#game-room-code").textContent = "SOLO";
+  renderSoloStrip();
+  saveSoloGame();
+}
+
+function soloFinish(status) {
+  State.finishedAt = Date.now();
+  stopTimer();
+  updateHintBadge();
+  clearSoloSave();
+  const seconds = Math.floor(getElapsedMs() / 1000);
+  State.room.game.finished[State.playerId] = {
+    status, time: seconds, mistakes: State.mistakes, at: Date.now()
+  };
+  const isBest = status === "won"
+    ? maybeRecordBest(State.room.game.difficulty, seconds, State.hintsUsed, State.room.game.clues)
+    : false;
+  renderBestList();
+  showSoloEndModal(status, seconds, isBest);
+}
+
+function showSoloEndModal(status, seconds, isBest) {
+  const g = State.room.game;
+  const modal = $("#end-modal");
+  modal.classList.remove("win", "loss", "draw");
+  modal.classList.add(status === "won" ? "win" : "loss");
+  const levelName = g.difficulty.charAt(0).toUpperCase() + g.difficulty.slice(1);
+
+  $("#result-label").textContent = status === "won" ? "SOLVED" : "OUT OF MISTAKES";
+  $("#result-title").textContent = status === "won"
+    ? (isBest ? "New best time" : "Solved")
+    : "Out of mistakes";
+
+  let sub = status === "won"
+    ? `${fmtTime(seconds)} on ${levelName}, ${g.clues} clues.`
+    : `You hit the mistake limit on ${levelName}.`;
+  if (status === "won") {
+    if (State.hintsUsed > 0) sub += ` ${State.hintsUsed} hint${State.hintsUsed === 1 ? "" : "s"} used, so it doesn't count for your best.`;
+    else if (!isBest) {
+      const b = soloBests()[g.difficulty];
+      if (b) sub += ` Your best is ${fmtTime(b.seconds)}.`;
+    }
+  }
+  if (g.hardest) sub += ` Hardest step: ${g.hardest}.`;
+  $("#result-sub").textContent = sub;
+
+  const stats = $("#result-stats");
+  stats.innerHTML = "";
+  stats.classList.add("solo");
+  // Same stat cards the duel uses, three of them instead of two players.
+  const best = soloBests()[g.difficulty];
+  const cards = [
+    ["TIME", fmtTime(seconds), isBest ? "new best" : (best ? `best ${fmtTime(best.seconds)}` : "no best yet")],
+    ["MISTAKES", String(State.mistakes), g.mistakeLimit > 0 ? `limit ${g.mistakeLimit}` : "no limit"],
+    ["HINTS", String(State.hintsUsed), State.hintsUsed ? "record not set" : "none used"]
+  ];
+  cards.forEach(([who, value, detail], i) => {
+    const card = document.createElement("div");
+    card.className = "stat-card" + (i === 0 && status === "won" ? " winner" : "");
+    card.innerHTML = `
+      <div class="who">${who}</div>
+      <div class="value">${escapeHTML(value)}</div>
+      <div class="detail">${escapeHTML(detail)}</div>
+    `;
+    stats.appendChild(card);
+  });
+
+  $("#btn-rematch").textContent = "New puzzle";
+  updatePracticeButton();
+  $("#end-modal-backdrop").classList.add("active");
+  if (status === "won") Sound.victory(); else Sound.defeat();
+}
+
+function leaveSolo() {
+  State.practice = false;
+  $("#coach-bar").style.display = "none";
+  $("#btn-leave-game").textContent = "← Leave";
+  stopTimer();
+  saveSoloGame();
+  State.solo = false;
+  State.room = null;
+  State.soloPausedAt = null;
+  State.pausedTotalMs = 0;
+  State.finishedAt = null;
+  $("#btn-pause").style.display = "none";
+  $("#pause-veil").classList.remove("show");
+  $("#end-modal-backdrop").classList.remove("active");
+  $("#btn-rematch").textContent = "Rematch";
+  refreshSoloEntryPoints();
+  showScreen("screen-home");
+}
+
+function renderSoloSetup() {
+  const cfg = soloSettings();
+  $$("#solo-difficulty-grid .diff-btn").forEach(b => b.classList.toggle("active", b.dataset.diff === cfg.difficulty));
+  $("#solo-clues-slider").value = cfg.clues;
+  $("#solo-clues-value").textContent = cfg.clues;
+  const L = SudokuEngine.LEVELS[cfg.difficulty];
+  $("#solo-level-note").textContent = `${LEVEL_BLURB[cfg.difficulty] || ""} ${L.min}–${L.max} clues.`;
+  $("#solo-mistakes-slider").value = cfg.mistakeLimit;
+  $("#solo-mistakes-value").textContent = cfg.mistakeLimit === 0 ? "Off" : cfg.mistakeLimit;
+  $("#solo-mistakes-label").textContent = cfg.mistakeLimit === 0 ? "no limit" : (cfg.mistakeLimit === 1 ? "mistake" : "mistakes");
+  $("#solo-hints-slider").value = cfg.hintsPerDuel;
+  $("#solo-hints-value").textContent = cfg.hintsPerDuel === 0 ? "Off" : cfg.hintsPerDuel;
+  $("#solo-hints-label").textContent = cfg.hintsPerDuel === 0 ? "no hints" : (cfg.hintsPerDuel === 1 ? "hint" : "hints");
+  renderBestList();
+  refreshSoloEntryPoints();
+}
+
+function bindSoloEvents() {
+  $("#btn-solo-open").addEventListener("click", () => { renderSoloSetup(); showScreen("screen-solo"); });
+  $("#btn-solo-back").addEventListener("click", () => showScreen("screen-home"));
+  $("#btn-solo-resume").addEventListener("click", resumeSoloGame);
+  $("#btn-solo-start").addEventListener("click", startSolo);
+  $("#btn-pause").addEventListener("click", () => { State.soloPausedAt ? resumeSolo() : pauseSolo(); });
+  $("#btn-resume").addEventListener("click", resumeSolo);
+
+  $$("#solo-difficulty-grid .diff-btn").forEach(b => {
+    b.addEventListener("click", () => {
+      const diff = b.dataset.diff;
+      saveSoloSettings({ difficulty: diff, clues: diffToClues(diff) });
+      renderSoloSetup();
+    });
+  });
+  $("#solo-clues-slider").addEventListener("input", (e) => {
+    const raw = parseInt(e.target.value, 10);
+    const cur = soloSettings().difficulty;
+    const L = SudokuEngine.LEVELS[cur];
+    const diff = (raw >= L.min && raw <= L.max) ? cur : cluesToDifficulty(raw);
+    saveSoloSettings({ difficulty: diff, clues: clampCluesToLevel(diff, raw) });
+    renderSoloSetup();
+  });
+  $("#solo-mistakes-slider").addEventListener("input", (e) => {
+    saveSoloSettings({ mistakeLimit: parseInt(e.target.value, 10) });
+    renderSoloSetup();
+  });
+  $("#solo-hints-slider").addEventListener("input", (e) => {
+    saveSoloSettings({ hintsPerDuel: parseInt(e.target.value, 10) });
+    renderSoloSetup();
+  });
 }
 
 /* ============================================================
@@ -3610,13 +4572,29 @@ function buildThemePicker() {
   });
 }
 
-/* The picker has nothing to do with Firebase, so build it as soon as the
-   markup exists rather than waiting for the database to come up. */
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => { applyTheme(currentThemeId()); buildThemePicker(); });
-} else {
+/* Themes and solo play have nothing to do with Firebase, so they come up as
+   soon as the markup exists rather than waiting for the database. Runs once,
+   whichever calls it first. */
+let __offlineUIReady = false;
+function bindOfflineCapableUI() {
+  if (__offlineUIReady) return;
+  __offlineUIReady = true;
   applyTheme(currentThemeId());
   buildThemePicker();
+  bindSoloEvents();
+  bindSoloUnlock();
+  // ?solo=1 unlocks it, ?solo=0 hides it again.
+  try {
+    const flag = new URLSearchParams(location.search).get("solo");
+    if (flag === "1") setSoloEnabled(true);
+    else if (flag === "0") setSoloEnabled(false);
+  } catch (e) { /* ignore a malformed query string */ }
+  applySoloVisibility();
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bindOfflineCapableUI);
+} else {
+  bindOfflineCapableUI();
 }
 
 /* ============================================================
@@ -3669,6 +4647,9 @@ function watchConnection() {
 /** Queue the offline marker, then assert that we are here. */
 async function armPresence(code, announceReturn) {
   if (!CONFIGURED || !code) return;
+  // A reconnect that lands while we're leaving must not put us back in the
+  // room we just left.
+  if (State._intentionallyLeaving || State.roomCode !== code) return;
   const playerRef = FB.ref(DB, `rooms/${code}/players/${State.playerId}`);
   State._disconnectPlayerRef = playerRef;
   try {
@@ -3677,6 +4658,7 @@ async function armPresence(code, announceReturn) {
       offlineAt: { ".sv": "timestamp" }
     });
     const snap = await FB.get(playerRef);
+    if (State._intentionallyLeaving || State.roomCode !== code) return;
     if (snap.exists()) {
       await FB.update(playerRef, { online: true, offlineAt: null });
       if (announceReturn) toast("Reconnected", 2200);
@@ -3719,6 +4701,26 @@ function cancelDisconnectHandlers() {
   State._disconnectRoomRef = null;
 }
 
+/* An opponent who vanished from the LOBBY doesn't forfeit — there's nothing to
+   forfeit yet. After the grace period the player who is still here frees their
+   seat, so the room can be filled again instead of sitting there full. */
+async function checkLobbyPresence(room) {
+  if (!CONFIGURED || !State.connected || State.solo || State.practice) return;
+  if (!room || room.status !== "lobby" || !State.roomCode) return;
+  const grace = opponentGraceLeft(room);
+  if (!grace) { State._lobbyEvictFor = null; return; }
+  if (grace.ms > 0) return;
+  if (State._lobbyEvictFor === grace.oppId) return;
+  State._lobbyEvictFor = grace.oppId;
+  try {
+    await FB.remove(FB.ref(DB, `rooms/${State.roomCode}/players/${grace.oppId}`));
+    toast("Your rival dropped out — the room's open again", 3200);
+  } catch (e) {
+    console.error("Lobby eviction failed", e);
+    State._lobbyEvictFor = null;
+  }
+}
+
 /** How long the opponent has left before they forfeit, or null if they are here. */
 function opponentGraceLeft(room) {
   if (!room || !room.players) return null;
@@ -3733,6 +4735,7 @@ function opponentGraceLeft(room) {
    network cannot write anything, so there is no race to lose. */
 async function checkOpponentPresence(room) {
   if (!CONFIGURED || !State.connected) return;
+  if (State.practice || State.solo) return;   // the duel is over; not our business
   if (!room || room.status !== "playing" || !room.game) return;
   if (room.game.finished && room.game.finished[State.playerId]) return;
   const grace = opponentGraceLeft(room);
@@ -3742,11 +4745,12 @@ async function checkOpponentPresence(room) {
   if (State._forfeitClaimFor === grace.oppId) return;
   State._forfeitClaimFor = grace.oppId;
   try {
-    await FB.update(FB.ref(DB, `rooms/${State.roomCode}/game/finished/${grace.oppId}`), {
-      status: "forfeit",
-      time: 0,
-      mistakes: 0,
-      at: { ".sv": "timestamp" }
+    // A transaction, not a blind write: if they finished while offline and the
+    // result is still queued on their machine, their finish must survive our
+    // timeout rather than being overwritten by it. First one in wins.
+    await FB.runTransaction(FB.ref(DB, `rooms/${State.roomCode}/game/finished/${grace.oppId}`), (current) => {
+      if (current) return;      // already finished — abort
+      return { status: "forfeit", time: 0, mistakes: 0, at: Date.now() };
     });
   } catch (e) {
     console.error("Forfeit claim failed", e);
@@ -3767,13 +4771,15 @@ function renderConnectionBanner() {
   }
 
   const room = State.room;
-  const grace = room && room.status === "playing" ? opponentGraceLeft(room) : null;
+  const inRoom = room && (room.status === "playing" || room.status === "lobby");
+  const grace = (inRoom && !State.practice && !State.solo) ? opponentGraceLeft(room) : null;
   const oppFinished = room && room.game && room.game.finished && grace && room.game.finished[grace.oppId];
   if (grace && !oppFinished && !State.finishedAt) {
     const oppName = (room.players[grace.oppId] && room.players[grace.oppId].name) || "Your rival";
     el.textContent = `${oppName} lost connection — ${Math.ceil(grace.ms / 1000)}s`;
     el.classList.add("show", "waiting");
-    checkOpponentPresence(room);
+    if (room.status === "lobby") checkLobbyPresence(room);
+    else checkOpponentPresence(room);
     return;
   }
   el.classList.remove("show", "waiting");
@@ -3909,6 +4915,9 @@ async function onToggleReady() {
 }
 
 function onRoomUpdate(room) {
+  // While practising, the duel is over and the screen is ours. Ignore the room
+  // until we come back out, then re-sync.
+  if (State.practice) return;
   if (room.status === "lobby") {
     if ($("#screen-game").classList.contains("active")) {
       // shouldn't happen but defensive
@@ -3962,12 +4971,13 @@ function renderLobby(room) {
     const p = room.players[pid];
     if (!p) continue;
     const isMe = pid === State.playerId;
+    const offline = p.online === false;
     const card = document.createElement("div");
-    card.className = "player-card" + (p.ready ? " ready" : "");
+    card.className = "player-card" + (p.ready && !offline ? " ready" : "") + (offline ? " offline" : "");
     card.innerHTML = `
       ${isMe ? '<div class="you-tag">YOU</div>' : ''}
       <div class="name">${escapeHTML(p.name || "Anonymous")}</div>
-      <div class="status">${p.ready ? "Ready ✓" : "Not ready"}</div>
+      <div class="status">${offline ? "Lost connection" : (p.ready ? "Ready ✓" : "Not ready")}</div>
     `;
     row.appendChild(card);
   }
@@ -4010,11 +5020,22 @@ function renderLobby(room) {
   }
 
   // Ready hint
-  const allReady = playerIds.length === 2 && playerIds.every(pid => room.players[pid].ready);
+  // Someone whose connection has dropped is not ready, whatever their record
+  // says — otherwise a duel starts against an empty chair and is won on a
+  // walkover the moment the grace period expires.
+  const anyOffline = playerIds.some(pid => room.players[pid].online === false);
+  const allReady = playerIds.length === 2 && !anyOffline
+    && playerIds.every(pid => room.players[pid].ready);
   if (playerIds.length < 2) {
     $("#ready-hint").textContent = "Share the code with your opponent.";
   } else if (playerIds.length > 2) {
     $("#ready-hint").textContent = "Room is overcrowded — please leave and create a fresh duel.";
+  } else if (anyOffline) {
+    const who = playerIds.find(pid => room.players[pid].online === false);
+    const name = (room.players[who] && room.players[who].name) || "Your rival";
+    $("#ready-hint").textContent = who === State.playerId
+      ? "You've lost your connection — hold on."
+      : `${name} lost connection. Waiting for them to come back…`;
   } else if (allReady) {
     $("#ready-hint").textContent = "Both ready! Starting…";
   } else {
@@ -4169,7 +5190,9 @@ async function startDuel(room) {
     hardest: built.hardest || "",
     mistakeLimit: room.settings.mistakeLimit,
     hintsPerDuel: initialHints,
-    startedAt: Date.now(),
+    // The server's clock, not the host's. Two devices whose clocks disagree
+    // would otherwise run two different timers on the same duel.
+    startedAt: { ".sv": "timestamp" },
     progress: {},
     finished: {},
     hints: {}
@@ -4186,11 +5209,18 @@ async function startDuel(room) {
       freebiesReceived: 0
     };
   });
-  await FB.update(FB.ref(DB, `rooms/${room.code}`), {
-    status: "playing",
-    game
-  });
-  State._startingDuel = false;
+  try {
+    await FB.update(FB.ref(DB, `rooms/${room.code}`), {
+      status: "playing",
+      game
+    });
+  } catch (e) {
+    console.error("Couldn't publish the duel", e);
+    toast("Couldn't start the duel — try ready again", 4000);
+  } finally {
+    // Whatever happened, let the next attempt through.
+    State._startingDuel = false;
+  }
 }
 
 function toRows(flat) {
@@ -4239,7 +5269,11 @@ function startGameFromRoom(room) {
   State.hintsRemaining = myHints.remaining || 0;
   State.hintsUsed = myHints.used || 0;
   State.lastAcknowledgedFreebies = myHints.freebiesReceived || 0;
-  State.startedAtMs = room.game.startedAt;
+  // A duel's startedAt is server time; convert it into this device's clock so
+  // everything downstream can keep using Date.now(). A solo game's is already local.
+  State.startedAtMs = room.solo
+    ? room.game.startedAt
+    : room.game.startedAt - (State.serverOffset || 0);
   State.finishedAt = null;
   State.lostByMistakes = false;
   State._endSoundPlayed = false;
@@ -4265,6 +5299,12 @@ function startGameFromRoom(room) {
 
 function bindGameEvents() {
   $("#btn-leave-game").addEventListener("click", () => {
+    if (State.practice) { exitPractice(); return; }
+    if (State.solo) {
+      leaveSolo();
+      toast("Saved — pick it up from the home screen", 2600);
+      return;
+    }
     if (confirm("Leave the duel? Your opponent wins by default.")) {
       State._intentionallyLeaving = true;
       forfeit();
@@ -4290,6 +5330,7 @@ function updateHintBadge() {
 
 async function onUseHint() {
   if (State.finishedAt) return;
+  if (State.soloPausedAt) return;
   if (State.hintsRemaining <= 0) {
     toast("No hints left");
     return;
@@ -4311,6 +5352,14 @@ async function onUseHint() {
   State.hintsRemaining--;
   State.hintsUsed++;
   updateHintBadge();
+
+  if (State.solo) {
+    State.room.game.hints[State.playerId].remaining = State.hintsRemaining;
+    State.room.game.hints[State.playerId].used = State.hintsUsed;
+    soloTouch();
+    if (isSolved()) onSolved();
+    return;
+  }
 
   // Sync my counts and signal opponent for a free reveal.
   try {
@@ -4443,6 +5492,11 @@ function flashHint(r, c) {
 }
 
 async function forfeit() {
+  // Nothing to forfeit unless a duel is actually running. Writing here after
+  // the room has gone back to the lobby recreates game/ and leaves a room that
+  // can never start another duel.
+  if (!State.roomCode || !CONFIGURED) return;
+  if (!State.room || State.room.status !== "playing" || !State.room.game) return;
   if (!State.room) return;
   cancelDisconnectHandlers();
   await FB.update(FB.ref(DB, `rooms/${State.roomCode}/game/finished/${State.playerId}`), {
@@ -4496,6 +5550,11 @@ function leaveRoom() {
   State._gameStarted = false;
   State._intentionallyLeaving = false;
   State._forfeitClaimFor = null;
+  State._lobbyEvictFor = null;
+  State.practice = false;
+  State.practiceSolved = false;
+  $("#coach-bar").style.display = "none";
+  $("#btn-leave-game").textContent = "← Leave";
   renderConnectionBanner();
   $("#end-modal-backdrop").classList.remove("active");
   showScreen("screen-home");
@@ -4588,6 +5647,7 @@ function applyHighlights() {
 }
 
 function selectCell(r, c) {
+  if (State.soloPausedAt) return;
   if (!State.selected || State.selected.r !== r || State.selected.c !== c) {
     Sound.select();
   }
@@ -4674,6 +5734,7 @@ function updateNumberPadCounts() {
 function enterNumber(n) {
   if (!State.selected) return;
   if (State.finishedAt) return;
+  if (State.soloPausedAt) return;   // paused: the board is hidden, so it's shut
   const { r, c } = State.selected;
   const cell = State.cells[r][c];
   if (cell.given || cell.locked) return;
@@ -4684,6 +5745,7 @@ function enterNumber(n) {
     cell.value = 0;
     Sound.note();
     renderBoard();
+    soloTouch();
     return;
   }
 
@@ -4697,6 +5759,7 @@ function enterNumber(n) {
     renderBoard();
     flashEntered(r, c);
     updateNumberPadCounts();
+    if (State.practice) { clearCoachMarks(); setCoachText("That's it.", true); $("#btn-coach").textContent = "Show me the next move"; State.coachStage = 0; State.coachStep = null; }
     pushProgress();
     maybeCelebrateBoxCompletion(r, c);
     if (isSolved()) onSolved();
@@ -4708,6 +5771,10 @@ function enterNumber(n) {
     cell.wrongTried.add(n);
     Sound.wrong();
     flashError(r, c);
+    if (State.practice) {
+      setCoachText("Not that one. No harm done — nothing's being counted.", true);
+      return;
+    }
     if (isNewMistake) {
       State.mistakes++;
       pushProgress();
@@ -4721,6 +5788,7 @@ function enterNumber(n) {
 function onErase() {
   if (!State.selected) return;
   if (State.finishedAt) return;
+  if (State.soloPausedAt) return;
   const { r, c } = State.selected;
   const cell = State.cells[r][c];
   if (cell.given || cell.locked) return;
@@ -4729,6 +5797,7 @@ function onErase() {
   cell.value = 0;
   if (cell.wrongTried) cell.wrongTried.clear();
   renderBoard();
+  soloTouch();
 }
 
 function onKeyDown(e) {
@@ -4788,9 +5857,9 @@ function isSolved() {
    ============================================================ */
 
 function getElapsedSec() {
-  if (!State.startedAtMs) return 0;
-  const end = State.finishedAt || Date.now();
-  return Math.floor((end - State.startedAtMs) / 1000);
+  // getElapsedMs knows about pauses; in a duel nothing ever pauses, so this
+  // is the same number it always was.
+  return Math.floor(getElapsedMs() / 1000);
 }
 
 function getFilledCount() {
@@ -4803,6 +5872,13 @@ function getFilledCount() {
 
 let lastPushedAt = 0;
 async function pushProgress(force = false) {
+  if (State.practice) { renderPracticeStrip(); return; }
+  if (State.solo) {
+    const p = State.room && State.room.game && State.room.game.progress[State.playerId];
+    if (p) { p.filled = getFilledCount(); p.mistakes = State.mistakes; p.time = getElapsedSec(); }
+    soloTouch();
+    return;
+  }
   if (!CONFIGURED || !State.roomCode) return;
   const now = Date.now();
   if (!force && now - lastPushedAt < 250) return; // simple throttle
@@ -4822,6 +5898,7 @@ function startTimer() {
   stopTimer();
   State.timerInterval = setInterval(() => {
     if (State.finishedAt) return;
+    if (State.solo && State.soloPausedAt) return;   // clock stopped
     pushProgress();
     renderOpponentsStrip(State.room);
   }, 1000);
@@ -4836,6 +5913,9 @@ function stopTimer() {
 
 function renderOpponentsStrip(room) {
   if (!room || !room.game) return;
+  if (State.practice) { renderPracticeStrip(); return; }
+  if (State.solo) { renderSoloStrip(); return; }
+  $("#opponents-strip").classList.remove("solo");
 
   // Detect opponent-triggered freebies (new ones since last render).
   // Each freebie => reveal a random empty cell on MY board, with toast + sound.
@@ -4936,21 +6016,33 @@ function renderOpponentsStrip(room) {
    ============================================================ */
 
 async function onSolved() {
+  if (State.practice) {
+    State.practiceSolved = true;
+    clearCoachMarks();
+    renderPracticeStrip();
+    setCoachText("Finished. It didn't count for the duel, but you got there.", false);
+    $("#btn-coach").textContent = "Show me the next move";
+    Sound.victory();
+    return;
+  }
+  if (State.solo) { soloFinish("won"); return; }
   State.finishedAt = Date.now();
   stopTimer();
   updateHintBadge();
   cancelDisconnectHandlers();
-  await FB.update(FB.ref(DB, `rooms/${State.roomCode}/game/finished/${State.playerId}`), {
-    status: "won",
-    time: getElapsedSec(),
-    mistakes: State.mistakes,
-    at: Date.now()
+  // Also a transaction: if we were timed out while offline, that stands rather
+  // than being quietly overwritten when our win finally reaches the server.
+  const myTime = getElapsedSec(), myMistakes = State.mistakes;
+  await FB.runTransaction(FB.ref(DB, `rooms/${State.roomCode}/game/finished/${State.playerId}`), (current) => {
+    if (current) return;
+    return { status: "won", time: myTime, mistakes: myMistakes, at: Date.now() };
   });
   await pushProgress(true);
   // The room listener will pick up the finish and show end screen
 }
 
 async function onLostByMistakes() {
+  if (State.solo) { State.lostByMistakes = true; soloFinish("lost"); return; }
   State.finishedAt = Date.now();
   State.lostByMistakes = true;
   stopTimer();
@@ -5068,6 +6160,7 @@ function showEndModal(room) {
 
   const stats = $("#result-stats");
   stats.innerHTML = "";
+  stats.classList.remove("solo");
   for (const [pid, label, isYou] of [
     [State.playerId, "YOU", true],
     [oppId, oppName.toUpperCase(), false]
@@ -5101,11 +6194,40 @@ function showEndModal(room) {
     else if (outcome === "loss") Sound.defeat();
   }
 
+  updatePracticeButton();
   $("#end-modal-backdrop").classList.add("active");
 }
 
+/* Offered whichever way the duel went: the loser gets a board to finish, the
+   winner gets their completed grid back to look over. Either way it beats
+   being bounced to the home screen. */
+function updatePracticeButton() {
+  const btn = $("#btn-practice");
+  if (!btn) return;
+  if (!State.cells) { btn.style.display = "none"; return; }
+  btn.style.display = "";
+  btn.textContent = isSolved() ? "Look at the board" : "Finish the puzzle";
+}
+
 function bindModalEvents() {
+  $("#btn-practice").addEventListener("click", enterPractice);
+  $("#btn-coach").addEventListener("click", onCoach);
+
   $("#btn-rematch").addEventListener("click", async () => {
+    if (State.solo) {
+      const wasFinishedAt = State.finishedAt;
+      $("#end-modal-backdrop").classList.remove("active");
+      State.finishedAt = null;
+      const before = State.soloPuzzleStr;
+      await startSolo();
+      if (State.soloPuzzleStr === before) {
+        // The build failed — put the finished board back rather than leaving
+        // a solved game live and playable.
+        State.finishedAt = wasFinishedAt || Date.now();
+        $("#end-modal-backdrop").classList.add("active");
+      }
+      return;
+    }
     if (!State.roomCode || !CONFIGURED) {
       leaveRoom();
       return;
@@ -5125,6 +6247,7 @@ function bindModalEvents() {
     refreshDisconnectHandlers(State.roomCode);
   });
   $("#btn-home-from-end").addEventListener("click", () => {
+    if (State.solo) { leaveSolo(); return; }
     // Clicking "Back to home" after the duel ends — also clean up the room (if we can)
     // so leftover finished rooms don't accumulate.
     State._intentionallyLeaving = true;
