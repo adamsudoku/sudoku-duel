@@ -562,6 +562,15 @@ input[type=range]::-moz-range-thumb {
   font-style: italic;
 }
 
+.level-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  margin: 10px 2px 0;
+  font-style: italic;
+  min-height: 2.2em;
+}
+
 .error-msg {
   background: rgba(212, 87, 78, 0.08);
   border: 1px solid rgba(212, 87, 78, 0.3);
@@ -1370,10 +1379,11 @@ input[type=range]::-moz-range-thumb {
         <button class="diff-btn" data-diff="expert">Expert</button>
       </div>
       <div class="slider-row">
-        <span class="clues-value" id="clues-value">36</span>
-        <input type="range" id="clues-slider" min="22" max="50" value="36" />
+        <span class="clues-value" id="clues-value">30</span>
+        <input type="range" id="clues-slider" min="20" max="50" value="30" />
         <span class="slider-label">clues</span>
       </div>
+      <p class="level-note" id="level-note"></p>
     </div>
 
     <div class="settings-block">
@@ -1393,7 +1403,7 @@ input[type=range]::-moz-range-thumb {
         <span class="slider-label" id="hints-label">hints</span>
       </div>
       <p style="font-size:11px; color:var(--ink-faint); margin-top:10px; line-height:1.5; font-style:italic;">
-        Hints reveal a random empty cell on your board. The catch: your opponent gets a free reveal too, on their board — same moment. Choose your moments.
+        Hints fill in the next square you could have worked out yourself, and tell you why. The catch: your opponent gets a free reveal too, on their board — same moment. Choose your moments.
       </p>
     </div>
 
@@ -1507,6 +1517,601 @@ input[type=range]::-moz-range-thumb {
   }
 </script>
 
+<!-- The sudoku engine lives in its own script block so the same source can be
+     loaded into a Web Worker (see makeEngineWorker) without duplicating it. -->
+<script id="sudoku-engine">
+/* ============================================================
+   SUDOKU ENGINE
+   Grid representation: a flat Int8Array(81), 0 = empty.
+   Everything here is pure and seed-driven, so a given seed always
+   yields the same puzzle on any machine.
+   ============================================================ */
+
+/* ---------- seeded RNG ---------- */
+function seedFromString(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = seed;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function shuffled(arr, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ---------- geometry, computed once ---------- */
+const ALL_MASK = 0x1FF;
+const BOX_OF = new Int8Array(81);
+for (let i = 0; i < 81; i++) BOX_OF[i] = (((i / 9) | 0) / 3 | 0) * 3 + (((i % 9) / 3) | 0);
+
+const UNITS = [];
+for (let r = 0; r < 9; r++) UNITS.push({ kind: "row", k: r, cells: Array.from({ length: 9 }, (_, c) => r * 9 + c) });
+for (let c = 0; c < 9; c++) UNITS.push({ kind: "col", k: c, cells: Array.from({ length: 9 }, (_, r) => r * 9 + c) });
+for (let b = 0; b < 9; b++) {
+  const br = ((b / 3) | 0) * 3, bc = (b % 3) * 3;
+  UNITS.push({ kind: "box", k: b, cells: Array.from({ length: 9 }, (_, i) => (br + ((i / 3) | 0)) * 9 + bc + (i % 3)) });
+}
+const PEERS = [];
+for (let i = 0; i < 81; i++) {
+  const s = new Set(), r = (i / 9) | 0, c = i % 9;
+  for (let k = 0; k < 9; k++) { s.add(r * 9 + k); s.add(k * 9 + c); }
+  for (const j of UNITS[18 + BOX_OF[i]].cells) s.add(j);
+  s.delete(i);
+  PEERS.push(Array.from(s));
+}
+const UNITS_OF = [];
+for (let i = 0; i < 81; i++) UNITS_OF.push([(i / 9) | 0, 9 + (i % 9), 18 + BOX_OF[i]]);
+
+const popcount = m => { let n = 0; while (m) { n++; m &= m - 1; } return n; };
+const lowIndex = m => { let d = 0, x = m & -m; while (x > 1) { x >>>= 1; d++; } return d; };
+
+/* ---------- solution counting / solving ----------
+   Bitmask + most-constrained-cell. Pass limit 2 for a uniqueness test:
+   it stops the moment a second solution appears.
+   `out` (optional Int8Array(81)) receives the first solution found. */
+function countSolutions(cellsIn, limit, out) {
+  if (limit == null) limit = 2;
+  const cells = Int8Array.from(cellsIn);
+  const rowM = new Int16Array(9), colM = new Int16Array(9), boxM = new Int16Array(9);
+  for (let i = 0; i < 81; i++) {
+    const v = cells[i];
+    if (v !== 0) {
+      const r = (i / 9) | 0, c = i % 9, b = BOX_OF[i], bit = 1 << (v - 1);
+      if ((rowM[r] & bit) || (colM[c] & bit) || (boxM[b] & bit)) return 0;
+      rowM[r] |= bit; colM[c] |= bit; boxM[b] |= bit;
+    }
+  }
+  let count = 0;
+  function rec() {
+    if (count >= limit) return;
+    let bestIdx = -1, bestMask = 0, bestCount = 10;
+    for (let i = 0; i < 81; i++) {
+      if (cells[i] !== 0) continue;
+      const r = (i / 9) | 0, c = i % 9;
+      const avail = (~(rowM[r] | colM[c] | boxM[BOX_OF[i]])) & ALL_MASK;
+      const n = popcount(avail);
+      if (n === 0) return;
+      if (n < bestCount) { bestCount = n; bestIdx = i; bestMask = avail; if (n === 1) break; }
+    }
+    if (bestIdx === -1) {
+      count++;
+      if (count === 1 && out) out.set(cells);
+      return;
+    }
+    const r = (bestIdx / 9) | 0, c = bestIdx % 9, b = BOX_OF[bestIdx];
+    let m = bestMask;
+    while (m) {
+      const lsb = m & -m; m ^= lsb;
+      cells[bestIdx] = lowIndex(lsb) + 1;
+      rowM[r] |= lsb; colM[c] |= lsb; boxM[b] |= lsb;
+      rec();
+      cells[bestIdx] = 0;
+      rowM[r] ^= lsb; colM[c] ^= lsb; boxM[b] ^= lsb;
+      if (count >= limit) return;
+    }
+  }
+  rec();
+  return count;
+}
+
+/** Solve a puzzle known to be uniquely solvable. Returns Int8Array(81) or null. */
+function solvePuzzle(cellsIn) {
+  const out = new Int8Array(81);
+  return countSolutions(cellsIn, 1, out) === 1 ? out : null;
+}
+
+/* ---------- full-grid generation ----------
+   Randomised backtracking fill. Unlike permuting a fixed canonical grid,
+   this samples the whole space of valid grids, so puzzles are not all
+   relabellings of one another. */
+function generateSolved(seed) {
+  const rng = mulberry32(seed);
+  const cells = new Int8Array(81);
+  const rowM = new Int16Array(9), colM = new Int16Array(9), boxM = new Int16Array(9);
+  const orders = [];
+  for (let i = 0; i < 81; i++) orders.push(null);
+  function fill(i) {
+    if (i === 81) return true;
+    const r = (i / 9) | 0, c = i % 9, b = BOX_OF[i];
+    const avail = (~(rowM[r] | colM[c] | boxM[b])) & ALL_MASK;
+    const cands = [];
+    for (let d = 0; d < 9; d++) if (avail & (1 << d)) cands.push(d);
+    for (const d of shuffled(cands, rng)) {
+      const bit = 1 << d;
+      cells[i] = d + 1; rowM[r] |= bit; colM[c] |= bit; boxM[b] |= bit;
+      if (fill(i + 1)) return true;
+      cells[i] = 0; rowM[r] ^= bit; colM[c] ^= bit; boxM[b] ^= bit;
+    }
+    return false;
+  }
+  fill(0);
+  return cells;
+}
+
+/* ============================================================
+   HUMAN-TECHNIQUE SOLVER
+   Solves the way a person does, cheapest technique first, and records
+   what it had to reach for. That gives us a difficulty rating that
+   means something, and a hint that can explain itself.
+   ============================================================ */
+
+function makeCandidateState(cellsIn) {
+  const val = Int8Array.from(cellsIn);
+  const cand = new Int16Array(81).fill(ALL_MASK);
+  for (let i = 0; i < 81; i++) if (val[i]) cand[i] = 0;
+  for (let i = 0; i < 81; i++) {
+    if (!val[i]) continue;
+    const bit = 1 << (val[i] - 1);
+    for (const p of PEERS[i]) cand[p] &= ~bit;
+  }
+  return { val, cand };
+}
+function assign(st, i, d) {
+  st.val[i] = d;
+  st.cand[i] = 0;
+  const bit = 1 << (d - 1);
+  for (const p of PEERS[i]) st.cand[p] &= ~bit;
+}
+const rcName = i => `R${((i / 9) | 0) + 1}C${(i % 9) + 1}`;
+const unitName = u => u.kind === "row" ? `row ${u.k + 1}` : u.kind === "col" ? `column ${u.k + 1}` : `box ${u.k + 1}`;
+
+function combinations(arr, k) {
+  const out = [];
+  (function rec(start, cur) {
+    if (cur.length === k) { out.push(cur.slice()); return; }
+    for (let i = start; i < arr.length; i++) { cur.push(arr[i]); rec(i + 1, cur); cur.pop(); }
+  })(0, []);
+  return out;
+}
+
+/* Each technique returns a step description, or null.
+   A step is { place?: {i, d}, eliminations?: [[i, bit]], why: string } */
+function tNakedSingle(st) {
+  for (let i = 0; i < 81; i++) {
+    if (st.val[i] || popcount(st.cand[i]) !== 1) continue;
+    const d = lowIndex(st.cand[i]) + 1;
+    return { place: { i, d }, why: `${rcName(i)} can only be ${d} — every other digit already appears in its row, column or box.` };
+  }
+  return null;
+}
+function tHiddenSingle(st) {
+  for (const u of UNITS) {
+    for (let d = 0; d < 9; d++) {
+      const bit = 1 << d;
+      let spot = -1, n = 0, taken = false;
+      for (const i of u.cells) {
+        if (st.val[i] === d + 1) { taken = true; break; }
+        if (st.cand[i] & bit) { n++; spot = i; }
+      }
+      if (!taken && n === 1) {
+        return { place: { i: spot, d: d + 1 }, why: `${unitName(u)} has only one square left that can hold a ${d + 1}: ${rcName(spot)}.` };
+      }
+    }
+  }
+  return null;
+}
+function tLockedCandidates(st) {
+  // Pointing: a digit confined to one row/column within a box.
+  for (let b = 0; b < 9; b++) {
+    const box = UNITS[18 + b].cells;
+    for (let d = 0; d < 9; d++) {
+      const bit = 1 << d;
+      const spots = box.filter(i => st.cand[i] & bit);
+      if (spots.length < 2) continue;
+      const rows = new Set(spots.map(i => (i / 9) | 0)), cols = new Set(spots.map(i => i % 9));
+      if (rows.size === 1) {
+        const r = [...rows][0], el = [];
+        for (let c = 0; c < 9; c++) { const i = r * 9 + c; if (BOX_OF[i] !== b && (st.cand[i] & bit)) el.push([i, bit]); }
+        if (el.length) return { eliminations: el, why: `In box ${b + 1} every ${d + 1} must sit in row ${r + 1}, so ${d + 1} is out elsewhere in that row.` };
+      }
+      if (cols.size === 1) {
+        const c = [...cols][0], el = [];
+        for (let r = 0; r < 9; r++) { const i = r * 9 + c; if (BOX_OF[i] !== b && (st.cand[i] & bit)) el.push([i, bit]); }
+        if (el.length) return { eliminations: el, why: `In box ${b + 1} every ${d + 1} must sit in column ${c + 1}, so ${d + 1} is out elsewhere in that column.` };
+      }
+    }
+  }
+  // Claiming: a digit in a row/column confined to one box.
+  for (let ui = 0; ui < 18; ui++) {
+    const u = UNITS[ui];
+    for (let d = 0; d < 9; d++) {
+      const bit = 1 << d;
+      const spots = u.cells.filter(i => st.cand[i] & bit);
+      if (spots.length < 2) continue;
+      const boxes = new Set(spots.map(i => BOX_OF[i]));
+      if (boxes.size !== 1) continue;
+      const b = [...boxes][0], inUnit = new Set(u.cells), el = [];
+      for (const i of UNITS[18 + b].cells) if (!inUnit.has(i) && (st.cand[i] & bit)) el.push([i, bit]);
+      if (el.length) return { eliminations: el, why: `The ${d + 1} in ${unitName(u)} must land in box ${b + 1}, so ${d + 1} is out elsewhere in that box.` };
+    }
+  }
+  return null;
+}
+function tNakedSubset(st, size) {
+  for (const u of UNITS) {
+    const open = u.cells.filter(i => !st.val[i] && st.cand[i]);
+    if (open.length <= size) continue;
+    for (const combo of combinations(open, size)) {
+      let m = 0;
+      for (const i of combo) m |= st.cand[i];
+      if (popcount(m) !== size) continue;
+      const inCombo = new Set(combo), el = [];
+      for (const i of open) if (!inCombo.has(i) && (st.cand[i] & m)) el.push([i, st.cand[i] & m]);
+      if (el.length) {
+        const digits = [];
+        for (let d = 0; d < 9; d++) if (m & (1 << d)) digits.push(d + 1);
+        return { eliminations: el, why: `${combo.map(rcName).join(", ")} in ${unitName(u)} hold only ${digits.join("/")} between them, so those digits are out of the rest of the ${u.kind}.` };
+      }
+    }
+  }
+  return null;
+}
+function tHiddenSubset(st, size) {
+  for (const u of UNITS) {
+    const open = u.cells.filter(i => !st.val[i] && st.cand[i]);
+    if (open.length <= size) continue;
+    const digits = [];
+    for (let d = 0; d < 9; d++) { const bit = 1 << d; if (open.some(i => st.cand[i] & bit)) digits.push(d); }
+    for (const combo of combinations(digits, size)) {
+      let mask = 0;
+      for (const d of combo) mask |= 1 << d;
+      const spots = open.filter(i => st.cand[i] & mask);
+      if (spots.length !== size) continue;
+      const el = [];
+      for (const i of spots) if (st.cand[i] & ~mask) el.push([i, st.cand[i] & ~mask]);
+      if (el.length) {
+        return { eliminations: el, why: `In ${unitName(u)}, ${combo.map(d => d + 1).join("/")} can only go in ${spots.map(rcName).join(", ")}, so nothing else belongs in those squares.` };
+      }
+    }
+  }
+  return null;
+}
+function tFish(st, size) {
+  const label = size === 2 ? "X-wing" : size === 3 ? "swordfish" : "jellyfish";
+  for (let d = 0; d < 9; d++) {
+    const bit = 1 << d;
+    for (const orient of ["row", "col"]) {
+      const lines = [];
+      for (let k = 0; k < 9; k++) {
+        const cells = orient === "row"
+          ? Array.from({ length: 9 }, (_, c) => k * 9 + c)
+          : Array.from({ length: 9 }, (_, r) => r * 9 + k);
+        const spots = cells.filter(i => st.cand[i] & bit);
+        if (spots.length >= 2 && spots.length <= size) lines.push({ k, spots });
+      }
+      if (lines.length < size) continue;
+      for (const combo of combinations(lines, size)) {
+        const cross = new Set();
+        for (const l of combo) for (const i of l.spots) cross.add(orient === "row" ? i % 9 : (i / 9) | 0);
+        if (cross.size !== size) continue;
+        const inLines = new Set(combo.map(l => l.k)), el = [];
+        for (const x of cross) {
+          for (let k = 0; k < 9; k++) {
+            if (inLines.has(k)) continue;
+            const i = orient === "row" ? k * 9 + x : x * 9 + k;
+            if (st.cand[i] & bit) el.push([i, bit]);
+          }
+        }
+        if (el.length) {
+          const where = orient === "row" ? "rows" : "columns";
+          return { eliminations: el, why: `${label}: the ${d + 1}s in ${where} ${combo.map(l => l.k + 1).join(" and ")} line up, ruling ${d + 1} out of the crossing lines.` };
+        }
+      }
+    }
+  }
+  return null;
+}
+function tXYWing(st) {
+  const bi = [];
+  for (let i = 0; i < 81; i++) if (!st.val[i] && popcount(st.cand[i]) === 2) bi.push(i);
+  for (const pivot of bi) {
+    const wings = bi.filter(i => i !== pivot && PEERS[pivot].includes(i) && popcount(st.cand[pivot] & st.cand[i]) === 1);
+    for (let a = 0; a < wings.length; a++) {
+      for (let b = a + 1; b < wings.length; b++) {
+        const w1 = wings[a], w2 = wings[b];
+        if (st.cand[w1] === st.cand[w2]) continue;
+        if ((st.cand[pivot] | st.cand[w1] | st.cand[w2]) !== (st.cand[w1] | st.cand[w2])) continue;
+        if (popcount(st.cand[w1] | st.cand[w2] | st.cand[pivot]) !== 3) continue;
+        const shared = st.cand[w1] & st.cand[w2];
+        if (popcount(shared) !== 1 || (st.cand[pivot] & shared)) continue;
+        const el = [];
+        for (let i = 0; i < 81; i++) {
+          if (st.val[i] || i === w1 || i === w2 || i === pivot) continue;
+          if (PEERS[w1].includes(i) && PEERS[w2].includes(i) && (st.cand[i] & shared)) el.push([i, shared]);
+        }
+        if (el.length) {
+          return { eliminations: el, why: `XY-wing on ${rcName(pivot)} with ${rcName(w1)} and ${rcName(w2)}: one of the wings must be ${lowIndex(shared) + 1}, so it is out of every square both wings see.` };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/* Ordered cheapest first. `cost` feeds the difficulty score; `tier` is the
+   band a puzzle lands in when this is the hardest thing it needs. */
+const TECHNIQUES = [
+  { name: "naked single",      cost: 1,  tier: 0, run: st => tNakedSingle(st) },
+  { name: "hidden single",     cost: 2,  tier: 0, run: st => tHiddenSingle(st) },
+  { name: "locked candidates", cost: 5,  tier: 1, run: st => tLockedCandidates(st) },
+  { name: "naked pair",        cost: 8,  tier: 1, run: st => tNakedSubset(st, 2) },
+  { name: "hidden pair",       cost: 12, tier: 2, run: st => tHiddenSubset(st, 2) },
+  { name: "naked triple",      cost: 16, tier: 2, run: st => tNakedSubset(st, 3) },
+  { name: "hidden triple",     cost: 20, tier: 2, run: st => tHiddenSubset(st, 3) },
+  { name: "X-wing",            cost: 28, tier: 3, run: st => tFish(st, 2) },
+  { name: "XY-wing",           cost: 32, tier: 3, run: st => tXYWing(st) },
+  { name: "swordfish",         cost: 45, tier: 3, run: st => tFish(st, 3) },
+];
+
+/** Take one step from the current candidate state. Returns
+ *  { techIndex, step } or null when nothing in the set applies. */
+function nextStep(st) {
+  for (let t = 0; t < TECHNIQUES.length; t++) {
+    const step = TECHNIQUES[t].run(st);
+    if (step) return { techIndex: t, step };
+  }
+  return null;
+}
+function applyStep(st, step) {
+  if (step.place) { assign(st, step.place.i, step.place.d); return; }
+  for (const [i, bits] of step.eliminations) st.cand[i] &= ~bits;
+}
+
+/** Rate a puzzle the way a solver would experience it.
+ *  { solvable, score, tier, hardest, counts } — solvable false means it
+ *  cannot be finished with these techniques, i.e. it needs guessing. */
+function ratePuzzle(cellsIn) {
+  const st = makeCandidateState(cellsIn);
+  let score = 0, hardestIdx = 0;
+  const counts = {};
+  let guard = 0;
+  for (;;) {
+    let done = true;
+    for (let i = 0; i < 81; i++) if (!st.val[i]) { done = false; break; }
+    if (done) {
+      return { solvable: true, score, tier: TECHNIQUES[hardestIdx].tier, hardest: TECHNIQUES[hardestIdx].name, counts };
+    }
+    if (++guard > 400) return { solvable: false, score, tier: 4, hardest: "beyond the technique set", counts };
+    const r = nextStep(st);
+    if (!r) return { solvable: false, score, tier: 4, hardest: "beyond the technique set", counts };
+    score += TECHNIQUES[r.techIndex].cost;
+    if (r.techIndex > hardestIdx) hardestIdx = r.techIndex;
+    counts[TECHNIQUES[r.techIndex].name] = (counts[TECHNIQUES[r.techIndex].name] || 0) + 1;
+    applyStep(st, r.step);
+  }
+}
+
+/** The next placement a player could justify from where the board stands,
+ *  with the reasoning. Used for hints. Returns {i, d, why} or null. */
+function nextPlacement(cellsIn) {
+  const st = makeCandidateState(cellsIn);
+  for (let guard = 0; guard < 400; guard++) {
+    const r = nextStep(st);
+    if (!r) return null;
+    if (r.step.place) {
+      return { i: r.step.place.i, d: r.step.place.d, why: r.step.why, technique: TECHNIQUES[r.techIndex].name };
+    }
+    applyStep(st, r.step);
+  }
+  return null;
+}
+
+/* ============================================================
+   CARVING
+   Dig cells out while uniqueness holds, then keep perturbing:
+   put a few clues back, dig again, keep the result if it improved.
+   That escapes the local minima plain digging gets stuck in, which is
+   what used to put a floor around 22-24 clues.
+   ============================================================ */
+function digOnce(solution, rng, floor, work) {
+  const p = work || new Int8Array(81);
+  p.set(solution);
+  let clues = 81;
+  for (const i of shuffled(ORDER81, rng)) {
+    if (clues === floor) break;
+    const saved = p[i];
+    p[i] = 0;
+    if (countSolutions(p, 2) === 1) clues--; else p[i] = saved;
+  }
+  return clues;
+}
+const ORDER81 = Array.from({ length: 81 }, (_, i) => i);
+
+/** Carve `solution` down towards `target` clues. `rounds` bounds the search
+ *  so the cost stays predictable. Returns { puzzle, clues }. */
+function carve(solution, rng, target, rounds) {
+  const work = new Int8Array(81);
+  let bestClues = digOnce(solution, rng, target, work);
+  let best = Int8Array.from(work);
+  for (let n = 0; n < rounds && bestClues > target; n++) {
+    work.set(best);
+    const zeros = [];
+    for (let i = 0; i < 81; i++) if (!work[i]) zeros.push(i);
+    const k = 2 + Math.floor(rng() * 5);
+    for (const i of shuffled(zeros, rng).slice(0, k)) work[i] = solution[i];
+    let clues = bestClues + k;
+    for (const i of shuffled(ORDER81, rng)) {
+      if (clues === target) break;
+      if (!work[i]) continue;
+      const saved = work[i];
+      work[i] = 0;
+      if (countSolutions(work, 2) === 1) clues--; else work[i] = saved;
+    }
+    if (clues <= bestClues) { best.set(work); bestClues = clues; }
+  }
+  return { puzzle: best, clues: bestClues };
+}
+
+/* ============================================================
+   makePuzzle
+   Generates a uniquely-solvable puzzle that a person can actually
+   reason their way through, in the requested difficulty band, as close
+   to the requested clue count as the band allows.
+   ============================================================ */
+/* Four levels, defined by what the puzzle actually demands and how long
+   it runs. Easy and Medium need the same techniques — singles — and differ
+   in length, which is honest: above about 32 clues every uniquely-solvable
+   puzzle is a singles puzzle, so a "harder" 40-clue puzzle does not exist.
+   Hard and Expert differ from them in kind, not just in length.
+
+   tier: 0 singles · 1 locked candidates / naked pairs · 2 subsets · 3 fish and wings
+   Measured over 60 samples per clue count, tier-1 puzzles appear in roughly
+   a quarter of carvings at 22-26 clues and almost never above 30, which is
+   what sets each level's clue window. */
+const LEVELS = {
+  easy:   { minTier: 0, maxTier: 0, clues: 40, min: 32, max: 50, budget: 6  },
+  medium: { minTier: 0, maxTier: 0, clues: 30, min: 26, max: 36, budget: 8  },
+  hard:   { minTier: 1, maxTier: 1, clues: 26, min: 22, max: 30, budget: 40 },
+  expert: { minTier: 2, maxTier: 3, clues: 23, min: 20, max: 28, budget: 60 },
+};
+const LEVEL_ORDER = ["easy", "medium", "hard", "expert"];
+
+/** Which level a rated puzzle belongs to, ignoring clue count. */
+function levelOfRating(rating) {
+  if (!rating.solvable) return null;
+  if (rating.tier === 0) return "easy";
+  if (rating.tier === 1) return "hard";
+  return "expert";
+}
+
+/** Clamp a clue count into the window where a level can actually exist. */
+function cluesForLevel(level, clues) {
+  const L = LEVELS[level] || LEVELS.medium;
+  if (clues == null) return L.clues;
+  return Math.max(L.min, Math.min(L.max, clues));
+}
+
+/**
+ * @param seedStr      deterministic seed
+ * @param opts.level   "easy" | "medium" | "hard" | "expert"
+ * @param opts.clues   preferred clue count, clamped to the level's window
+ * Returns { puzzle: Int8Array(81), solution: Int8Array(81), clues, level,
+ *           rating, exact, candidates, ms }
+ */
+function makePuzzle(seedStr, opts) {
+  opts = opts || {};
+  const t0 = Date.now();
+  const want = LEVELS[opts.level] ? opts.level : "medium";
+  const L = LEVELS[want];
+  const wantClues = cluesForLevel(want, opts.clues);
+  const budget = opts.budget || L.budget;
+  const master = typeof seedStr === "number" ? seedStr : seedFromString(String(seedStr));
+  const carveRounds = wantClues <= 22 ? 400 : 60;
+
+  // At 21 clues and below, the carve itself is the expensive part and the
+  // grid is sparse enough to be a real fight, so Expert stops insisting on
+  // subsets or fish — otherwise a single puzzle can take half a minute.
+  const minTier = (want === "expert" && wantClues <= 21) ? 1 : L.minTier;
+
+  let best = null, bestPenalty = Infinity, candidates = 0;
+
+  for (let a = 0; a < budget; a++) {
+    const solution = generateSolved((master ^ Math.imul(a + 1, 0x9E3779B1)) >>> 0);
+    const rng = mulberry32((master ^ Math.imul(a * 7919 + 17, 0xA5A5A5A5)) >>> 0);
+    const { puzzle, clues } = carve(solution, rng, wantClues, carveRounds);
+    candidates++;
+    const rating = ratePuzzle(puzzle);
+    if (!rating.solvable) continue;            // needs guessing — never ship it
+    const inTier = rating.tier >= minTier && rating.tier <= L.maxTier;
+    const tierGap = inTier ? 0 : Math.min(Math.abs(rating.tier - minTier), Math.abs(rating.tier - L.maxTier));
+    const penalty = tierGap * 10 + Math.abs(clues - wantClues) / 40;
+    if (penalty < bestPenalty) {
+      bestPenalty = penalty;
+      best = {
+        puzzle, solution, clues, rating, exact: inTier,
+        level: inTier ? want : levelOfRating(rating),
+      };
+      if (inTier && Math.abs(clues - wantClues) <= 1) break;
+    }
+  }
+
+  if (!best) {
+    // Nothing logic-solvable turned up in budget. Ship a plain unique puzzle
+    // at the requested clue count rather than failing the duel.
+    const solution = generateSolved(master >>> 0);
+    const rng = mulberry32((master ^ 0x1234567) >>> 0);
+    const { puzzle, clues } = carve(solution, rng, wantClues, 60);
+    best = { puzzle, solution, clues, level: want, rating: ratePuzzle(puzzle), exact: false };
+  }
+  best.candidates = candidates;
+  best.ms = Date.now() - t0;
+  return best;
+}
+
+/* ---------- string form, for passing a puzzle between players ---------- */
+function gridToString(g) { let s = ""; for (let i = 0; i < 81; i++) s += g[i]; return s; }
+function stringToGrid(s) {
+  const g = new Int8Array(81);
+  for (let i = 0; i < 81; i++) { const ch = s.charCodeAt(i) - 48; g[i] = ch >= 1 && ch <= 9 ? ch : 0; }
+  return g;
+}
+
+/* ---------- exports ----------
+   The same source runs twice: once on the page, and once inside a Web
+   Worker built from this very <script> block, so puzzle generation never
+   blocks the board. One copy of the code, two homes. */
+var SudokuEngine = {
+  makePuzzle, ratePuzzle, nextPlacement, solvePuzzle, countSolutions,
+  generateSolved, carve, gridToString, stringToGrid, seedFromString,
+  mulberry32, TECHNIQUES, LEVELS, LEVEL_ORDER, levelOfRating, cluesForLevel
+};
+if (typeof window !== "undefined") {
+  window.SudokuEngine = SudokuEngine;
+} else if (typeof self !== "undefined") {
+  // Worker context: answer generation requests.
+  self.onmessage = function(e) {
+    const { jobId, seed, level, clues } = e.data || {};
+    try {
+      const r = makePuzzle(seed, { level, clues });
+      self.postMessage({
+        jobId, ok: true,
+        puzzle: gridToString(r.puzzle),
+        clues: r.clues, level: r.level, exact: r.exact,
+        tier: r.rating.tier, hardest: r.rating.hardest, ms: r.ms
+      });
+    } catch (err) {
+      self.postMessage({ jobId, ok: false, error: String(err && err.message || err) });
+    }
+  };
+}
+if (typeof module !== "undefined" && module.exports) module.exports = SudokuEngine;
+</script>
+
 <script>
 /* ============================================================
    SUDOKU DUEL — single-file app
@@ -1584,272 +2189,6 @@ function randomCode(len = 4) {
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
-
-/* ---------- Seeded RNG (mulberry32) ---------- */
-function seedFromString(str) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h >>> 0;
-}
-
-function mulberry32(seed) {
-  return function() {
-    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-    let t = seed;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
-
-function shuffled(arr, rng) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-/* ---------- Sudoku generation ----------
-   Generates a full solved board with seeded RNG by:
-   1. Starting from a canonical solved grid
-   2. Permuting digits (1-9 -> some permutation)
-   3. Permuting rows within bands, columns within stacks,
-      and bands/stacks themselves — all preserve sudoku validity
-   Then we dig out cells deterministically to leave the desired
-   number of clues.
-*/
-
-function canonicalSolution() {
-  // Standard canonical Sudoku pattern: value(r,c) = (3*(r mod 3) + floor(r/3) + c) mod 9 + 1.
-  // Guarantees that rows, columns, and 3x3 boxes are all permutations of 1..9.
-  const g = [];
-  for (let r = 0; r < 9; r++) {
-    g.push([]);
-    for (let c = 0; c < 9; c++) {
-      const val = ((3 * (r % 3) + Math.floor(r / 3) + c) % 9) + 1;
-      g[r].push(val);
-    }
-  }
-  return g;
-}
-
-function generateSolved(seed) {
-  const rng = mulberry32(seed);
-  let g = canonicalSolution();
-
-  // Permute digits
-  const digitPerm = shuffled([1,2,3,4,5,6,7,8,9], rng);
-  g = g.map(row => row.map(v => digitPerm[v - 1]));
-
-  // Permute rows within bands
-  for (let band = 0; band < 3; band++) {
-    const rows = [band*3, band*3+1, band*3+2];
-    const order = shuffled(rows, rng);
-    const newRows = order.map(r => g[r]);
-    newRows.forEach((row, i) => { g[band*3 + i] = row; });
-  }
-
-  // Permute columns within stacks
-  for (let stack = 0; stack < 3; stack++) {
-    const cols = [stack*3, stack*3+1, stack*3+2];
-    const order = shuffled(cols, rng);
-    g = g.map(row => {
-      const newRow = row.slice();
-      order.forEach((c, i) => { newRow[stack*3 + i] = row[c]; });
-      return newRow;
-    });
-  }
-
-  // Permute bands themselves
-  {
-    const bands = [0, 1, 2];
-    const order = shuffled(bands, rng);
-    const newG = [];
-    order.forEach(b => {
-      for (let i = 0; i < 3; i++) newG.push(g[b*3 + i]);
-    });
-    g = newG;
-  }
-
-  // Permute stacks
-  {
-    const stacks = [0, 1, 2];
-    const order = shuffled(stacks, rng);
-    g = g.map(row => {
-      const newRow = [];
-      order.forEach(s => {
-        for (let i = 0; i < 3; i++) newRow.push(row[s*3 + i]);
-      });
-      return newRow;
-    });
-  }
-
-  return g;
-}
-
-/* ---------- Solution counter ----------
-   Counts solutions to a partial grid, capped at `limit`.
-   Uses bitmask representation + MRV (most-constrained-cell) heuristic for speed.
-   Returns 0 if the grid is invalid, otherwise the solution count (up to limit).
-   Pass limit=2 for uniqueness checks — we stop as soon as a 2nd solution is found.
-*/
-function countSolutions(grid, limit) {
-  if (limit == null) limit = 2;
-  const cells = new Int8Array(81);
-  for (let r = 0; r < 9; r++) {
-    for (let c = 0; c < 9; c++) {
-      cells[r*9 + c] = grid[r][c];
-    }
-  }
-  const rowMask = new Int16Array(9);
-  const colMask = new Int16Array(9);
-  const boxMask = new Int16Array(9);
-  const boxOf = (r, c) => ((r/3)|0)*3 + ((c/3)|0);
-
-  for (let i = 0; i < 81; i++) {
-    const v = cells[i];
-    if (v !== 0) {
-      const r = (i/9)|0, c = i%9, b = boxOf(r, c);
-      const bit = 1 << (v - 1);
-      if ((rowMask[r] & bit) || (colMask[c] & bit) || (boxMask[b] & bit)) return 0;
-      rowMask[r] |= bit;
-      colMask[c] |= bit;
-      boxMask[b] |= bit;
-    }
-  }
-
-  let count = 0;
-  function recurse() {
-    if (count >= limit) return;
-    let bestIdx = -1, bestMask = 0, bestCount = 10;
-    for (let i = 0; i < 81; i++) {
-      if (cells[i] !== 0) continue;
-      const r = (i/9)|0, c = i%9;
-      const used = rowMask[r] | colMask[c] | boxMask[boxOf(r, c)];
-      const avail = (~used) & 0x1FF;
-      let n = 0, m = avail;
-      while (m) { n++; m &= m - 1; }
-      if (n === 0) return;
-      if (n < bestCount) {
-        bestCount = n;
-        bestIdx = i;
-        bestMask = avail;
-        if (n === 1) break;
-      }
-    }
-    if (bestIdx === -1) { count++; return; }
-    const r = (bestIdx/9)|0, c = bestIdx%9, b = boxOf(r, c);
-    let m = bestMask;
-    while (m) {
-      const lsb = m & -m;
-      m ^= lsb;
-      let d = 0, x = lsb;
-      while (x > 1) { x >>>= 1; d++; }
-      cells[bestIdx] = d + 1;
-      rowMask[r] |= lsb;
-      colMask[c] |= lsb;
-      boxMask[b] |= lsb;
-      recurse();
-      cells[bestIdx] = 0;
-      rowMask[r] ^= lsb;
-      colMask[c] ^= lsb;
-      boxMask[b] ^= lsb;
-      if (count >= limit) return;
-    }
-  }
-  recurse();
-  return count;
-}
-
-/* ---------- Clue carving with uniqueness guarantee ----------
-   Removes clues from the solution one at a time, checking after each removal
-   that the puzzle still has exactly one solution. Stops the moment we reach
-   the target — single-cell granularity means we can hit the target exactly
-   whenever it's achievable on this solution.
-
-   We do not enforce symmetry: doing so removes cells in pairs, which makes
-   it impossible to land on odd-distance targets, and can't reach low counts
-   when one cell of a pair is essential. Aesthetic symmetry isn't worth the
-   loss of precision for a duel.
-*/
-function carvePuzzle(solution, targetClues, rng) {
-  const puzzle = solution.map(row => row.slice());
-  let cluesLeft = 81;
-  const indices = shuffled(Array.from({length: 81}, (_, i) => i), rng);
-  for (const idx of indices) {
-    if (cluesLeft === targetClues) break;
-    const r = (idx/9)|0, c = idx%9;
-    if (puzzle[r][c] === 0) continue;
-    const saved = puzzle[r][c];
-    puzzle[r][c] = 0;
-    if (countSolutions(puzzle, 2) === 1) {
-      cluesLeft--;
-    } else {
-      puzzle[r][c] = saved;
-    }
-  }
-  return { puzzle, actualClues: cluesLeft };
-}
-
-/* ---------- makePuzzle ----------
-   Generates a uniquely-solvable puzzle with EXACTLY `clueCount` clues.
-
-   The carving process is randomized, so a single attempt may fall short of
-   the target (e.g. target 24 but the chosen removal order gets stuck at 26).
-   We retry many different removal orders across multiple solutions until we
-   hit the target exactly.
-
-   Determinism note: both duellists run makePuzzle independently with the same
-   seed, so we must produce the same puzzle on both ends. The attempt sequence
-   is purely seed-driven (no time-based limits), so this is guaranteed —
-   regardless of CPU speed differences, both ends will find the same puzzle
-   at the same attempt number.
-
-   Returns: { puzzle, solution, actualClues, requestedClues, exact }
-   - `exact: true`  → puzzle has exactly `clueCount` clues (the normal case
-                       for the supported slider range of 22+)
-   - `exact: false` → couldn't hit target after exhausting attempts; `actualClues`
-                       is the best (lowest) we managed. UI should surface this.
-
-   Performance for the supported slider range (22–50):
-     22 clues:   ~50–150ms typical
-     24 clues:   ~5–25ms
-     28+ clues:  ~1–5ms
-   Below 22 clues, achieving uniqueness with random removal is not reliably
-   possible, which is why the slider min is set to 22.
-*/
-function makePuzzle(seedStr, clueCount) {
-  const MAX_SOLUTIONS_TO_TRY = 8;
-  const ATTEMPTS_PER_SOLUTION = 80;
-
-  const masterSeed = seedFromString(seedStr);
-  let bestPuzzle = null, bestSolution = null, bestActual = 999, attempts = 0;
-
-  for (let sa = 0; sa < MAX_SOLUTIONS_TO_TRY; sa++) {
-    const solSeed = (masterSeed ^ Math.imul(sa + 1, 0x9E3779B1)) >>> 0;
-    const solution = generateSolved(solSeed);
-    for (let ca = 0; ca < ATTEMPTS_PER_SOLUTION; ca++) {
-      const rng = mulberry32((masterSeed ^ Math.imul(sa * 1000 + ca, 0xA5A5A5A5)) >>> 0);
-      const { puzzle, actualClues } = carvePuzzle(solution, clueCount, rng);
-      attempts++;
-      if (actualClues === clueCount) {
-        return { puzzle, solution, actualClues, requestedClues: clueCount, exact: true, attempts };
-      }
-      if (actualClues < bestActual) {
-        bestActual = actualClues;
-        bestPuzzle = puzzle;
-        bestSolution = solution;
-      }
-    }
-  }
-  // Couldn't hit exact target — return best we got. UI should surface this.
-  return { puzzle: bestPuzzle, solution: bestSolution, actualClues: bestActual, requestedClues: clueCount, exact: false, attempts };
 }
 
 /* ============================================================
@@ -2787,7 +3126,7 @@ async function onCreateRoom() {
         status: "lobby",
         createdAt: Date.now(),
         settings: {
-          clues: 36,
+          clues: 30,
           difficulty: "medium",
           mistakeLimit: 3,
           hintsPerDuel: 3
@@ -3027,16 +3366,22 @@ function bindLobbyEvents() {
       if (!State.room || State.room.status !== "lobby") return;
       const diff = b.dataset.diff;
       const clues = diffToClues(diff);
+      renderLevelNote(diff, clues);
       updateSettings({ difficulty: diff, clues });
     });
   });
 
   $("#clues-slider").addEventListener("input", (e) => {
     if (!State.room || State.room.status !== "lobby") return;
-    const clues = parseInt(e.target.value, 10);
-    const diff = cluesToDifficulty(clues);
+    const raw = parseInt(e.target.value, 10);
+    // Keep the chosen level if the value still fits its window; otherwise the
+    // slider itself is the instruction and the level follows the number.
+    const current = (State.room && State.room.settings.difficulty) || "medium";
+    const L = SudokuEngine.LEVELS[current] || SudokuEngine.LEVELS.medium;
+    const diff = (raw >= L.min && raw <= L.max) ? current : cluesToDifficulty(raw);
+    const clues = clampCluesToLevel(diff, raw);
     $("#clues-value").textContent = clues;
-    // Debounce a touch so we don't spam the DB
+    renderLevelNote(diff, clues);
     clearTimeout(window.__sliderTm);
     window.__sliderTm = setTimeout(() => {
       updateSettings({ clues, difficulty: diff });
@@ -3068,14 +3413,35 @@ function bindLobbyEvents() {
   $("#btn-ready").addEventListener("click", onToggleReady);
 }
 
+/* Difficulty is now a property of the puzzle, not of the clue count.
+   Each level has a clue window it can actually exist in — above roughly 32
+   clues every uniquely-solvable puzzle falls out to singles, so a 40-clue
+   Expert is not a thing. The slider moves within the chosen level's window. */
 function diffToClues(diff) {
-  return { easy: 42, medium: 34, hard: 28, expert: 24 }[diff] || 34;
+  const L = SudokuEngine.LEVELS[diff];
+  return L ? L.clues : SudokuEngine.LEVELS.medium.clues;
+}
+function clampCluesToLevel(diff, clues) {
+  return SudokuEngine.cluesForLevel(SudokuEngine.LEVELS[diff] ? diff : "medium", clues);
 }
 function cluesToDifficulty(c) {
-  if (c >= 40) return "easy";
-  if (c >= 32) return "medium";
-  if (c >= 26) return "hard";
+  // Only used when someone drags the slider past the current level's window.
+  if (c >= 37) return "easy";
+  if (c >= 31) return "medium";
+  if (c >= 27) return "hard";
   return "expert";
+}
+const LEVEL_BLURB = {
+  easy:   "Singles only — every square can be read straight off the grid.",
+  medium: "Singles only, but a longer grind with more of the board empty.",
+  hard:   "Needs locked candidates or naked pairs to break open.",
+  expert: "Needs subsets, X-wings or XY-wings. Never guesswork."
+};
+function renderLevelNote(diff, clues) {
+  const L = SudokuEngine.LEVELS[diff] || SudokuEngine.LEVELS.medium;
+  const note = $("#level-note");
+  if (!note) return;
+  note.textContent = `${LEVEL_BLURB[diff] || ""} ${clues < L.min || clues > L.max ? `Clues snap to ${L.min}–${L.max} at this level.` : `${L.min}–${L.max} clues.`}`;
 }
 
 async function updateSettings(patch) {
@@ -3189,6 +3555,7 @@ function renderLobby(room) {
   });
   $("#clues-slider").value = room.settings.clues;
   $("#clues-value").textContent = room.settings.clues;
+  renderLevelNote(room.settings.difficulty || "medium", room.settings.clues);
 
   const ml = room.settings.mistakeLimit ?? 3;
   $("#mistakes-slider").value = ml;
@@ -3225,6 +3592,10 @@ function renderLobby(room) {
     $("#ready-hint").textContent = "Both players must hit ready to begin.";
   }
 
+  // Build the puzzle in the background as soon as the settings settle, so
+  // "both ready" starts the duel instead of starting the search.
+  if (State.isCreator && !room.game) Pregen.warm(room.settings);
+
   // Auto-start when both ready — only the creator triggers, to avoid double-writes
   if (allReady && State.isCreator && !room.game) {
     startDuel(room);
@@ -3238,17 +3609,135 @@ function escapeHTML(s) {
 }
 
 /* ============================================================
+   PUZZLE SUPPLY
+   Generation used to run on both players' machines at kick-off, which
+   forced the search to be cheap and identical on a slow phone and a fast
+   laptop. Now the host builds the puzzle once, in a worker, while the
+   lobby is still open, and publishes the finished grid to the room. The
+   search can take as long as it needs; nobody watches a frozen board.
+   ============================================================ */
+
+const Pregen = {
+  worker: null,
+  workerDead: false,
+  jobId: 0,
+  inFlight: null,      // { key, promise }
+  ready: null,         // { key, result }
+
+  key(settings) {
+    return (settings.difficulty || "medium") + ":" + (settings.clues || 30);
+  },
+
+  getWorker() {
+    if (this.worker || this.workerDead) return this.worker;
+    try {
+      const el = document.getElementById("sudoku-engine");
+      if (!el || typeof Worker === "undefined" || typeof Blob === "undefined") throw new Error("no worker support");
+      const url = URL.createObjectURL(new Blob([el.textContent], { type: "application/javascript" }));
+      const w = new Worker(url);
+      w.onerror = () => { this.workerDead = true; this.worker = null; };
+      this.worker = w;
+    } catch (e) {
+      // Opening the file straight off disk blocks blob workers. Fall back to
+      // generating on the main thread — a brief pause, but it still works.
+      this.workerDead = true;
+      this.worker = null;
+    }
+    return this.worker;
+  },
+
+  generate(settings) {
+    const key = this.key(settings);
+    const level = settings.difficulty || "medium";
+    const clues = settings.clues || 30;
+    const seed = (State.roomCode || "solo") + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    const w = this.getWorker();
+    if (!w) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          const r = SudokuEngine.makePuzzle(seed, { level, clues });
+          resolve({
+            puzzle: SudokuEngine.gridToString(r.puzzle), clues: r.clues,
+            level: r.level, exact: r.exact, tier: r.rating.tier, hardest: r.rating.hardest, ms: r.ms, key
+          });
+        }, 0);
+      });
+    }
+    const jobId = ++this.jobId;
+    return new Promise(resolve => {
+      const onMsg = (e) => {
+        const d = e.data || {};
+        if (d.jobId !== jobId) return;
+        w.removeEventListener("message", onMsg);
+        if (!d.ok) {
+          const r = SudokuEngine.makePuzzle(seed, { level, clues });
+          resolve({ puzzle: SudokuEngine.gridToString(r.puzzle), clues: r.clues, level: r.level, exact: r.exact, tier: r.rating.tier, hardest: r.rating.hardest, ms: r.ms, key });
+          return;
+        }
+        d.key = key;
+        resolve(d);
+      };
+      w.addEventListener("message", onMsg);
+      w.postMessage({ jobId, seed, level, clues });
+    });
+  },
+
+  /** Start building a puzzle for these settings, if we aren't already. */
+  warm(settings) {
+    const key = this.key(settings);
+    if (this.ready && this.ready.key === key) return;
+    if (this.inFlight && this.inFlight.key === key) return;
+    const promise = this.generate(settings).then(res => {
+      if (this.key(settings) === res.key) this.ready = { key: res.key, result: res };
+      if (this.inFlight && this.inFlight.key === key) this.inFlight = null;
+      return res;
+    });
+    this.inFlight = { key, promise };
+  },
+
+  /** The puzzle for these settings — instant if the lobby warmed it up. */
+  take(settings) {
+    const key = this.key(settings);
+    if (this.ready && this.ready.key === key) {
+      const r = this.ready.result;
+      this.ready = null;
+      return Promise.resolve(r);
+    }
+    if (this.inFlight && this.inFlight.key === key) return this.inFlight.promise;
+    return this.generate(settings);
+  }
+};
+
+/* ============================================================
    START THE DUEL
    ============================================================ */
 
 async function startDuel(room) {
   // Generate puzzle seeded on the room code + a per-game salt
+  if (State._startingDuel) return;
+  State._startingDuel = true;
   const playerIds = Object.keys(room.players);
   const gameSeed = room.code + "_" + Date.now();
   const initialHints = room.settings.hintsPerDuel ?? 0;
+
+  let built;
+  try {
+    const hintEl = $("#ready-hint");
+    if (hintEl) hintEl.textContent = "Building the puzzle…";
+    built = await Pregen.take(room.settings);
+  } catch (e) {
+    console.error("Puzzle generation failed", e);
+    State._startingDuel = false;
+    toast("Couldn't build a puzzle — try again", 4000);
+    return;
+  }
+
   const game = {
     seed: gameSeed,
-    clues: room.settings.clues,
+    puzzle: built.puzzle,
+    clues: built.clues,
+    difficulty: built.level,
+    hardest: built.hardest || "",
     mistakeLimit: room.settings.mistakeLimit,
     hintsPerDuel: initialHints,
     startedAt: Date.now(),
@@ -3272,10 +3761,40 @@ async function startDuel(room) {
     status: "playing",
     game
   });
+  State._startingDuel = false;
+}
+
+function toRows(flat) {
+  const g = [];
+  for (let r = 0; r < 9; r++) {
+    const row = [];
+    for (let c = 0; c < 9; c++) row.push(flat[r * 9 + c]);
+    g.push(row);
+  }
+  return g;
 }
 
 function startGameFromRoom(room) {
-  const { puzzle, solution } = makePuzzle(room.game.seed, room.game.clues);
+  // The host publishes the finished grid, so both boards are identical by
+  // construction rather than by both machines agreeing on a search.
+  let puzzleFlat = null, solutionFlat = null;
+  const str = room.game.puzzle;
+  if (typeof str === "string" && str.length === 81) {
+    puzzleFlat = SudokuEngine.stringToGrid(str);
+    solutionFlat = SudokuEngine.solvePuzzle(puzzleFlat);
+  }
+  if (!puzzleFlat || !solutionFlat) {
+    // A room from an older build, or a corrupted grid: rebuild locally.
+    const r = SudokuEngine.makePuzzle(room.game.seed, {
+      level: room.game.difficulty || "medium",
+      clues: room.game.clues
+    });
+    puzzleFlat = r.puzzle;
+    solutionFlat = r.solution;
+  }
+  const puzzle = toRows(puzzleFlat);
+  const solution = toRows(solutionFlat);
+
   State.cells = puzzle.map((row, r) => row.map((v, c) => ({
     value: v,
     given: v !== 0,
@@ -3347,8 +3866,9 @@ async function onUseHint() {
     return;
   }
 
-  // Pick a random empty cell on MY board
-  const target = pickRandomEmptyCell();
+  // Reveal the square a player could next work out for themselves, and say
+  // why. A hint that teaches is worth more than a hint that just fills in.
+  const target = pickHintCell();
   if (!target) {
     toast("No empty cells to reveal");
     return;
@@ -3356,6 +3876,7 @@ async function onUseHint() {
   const { r, c } = target;
   revealCellAsHint(r, c);
   Sound.hintSelf();
+  if (target.why) toast(target.why, 5200);
 
   // Update local hint state
   State.hintsRemaining--;
@@ -3383,6 +3904,34 @@ async function onUseHint() {
   }
 
   if (isSolved()) onSolved();
+}
+
+/* The next square that follows from what is already on the board, with the
+   reasoning behind it. Built from the givens, revealed cells and whichever
+   of the player's own entries are correct, so a wrong entry can never send
+   the hint astray. Falls back to a random empty cell if the puzzle has
+   moved beyond the technique set. */
+function pickHintCell() {
+  const flat = new Int8Array(81);
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const cell = State.cells[r][c];
+      if (!cell.value) continue;
+      if (cell.given || cell.locked || cell.value === State.solution[r][c]) flat[r * 9 + c] = cell.value;
+    }
+  }
+  try {
+    const step = SudokuEngine.nextPlacement(flat);
+    if (step) {
+      const r = (step.i / 9) | 0, c = step.i % 9;
+      const cell = State.cells[r][c];
+      if (!cell.given && !cell.locked) return { r, c, why: step.why };
+    }
+  } catch (e) {
+    console.error("Hint reasoning failed", e);
+  }
+  const fallback = pickRandomEmptyCell();
+  return fallback ? { r: fallback.r, c: fallback.c, why: "" } : null;
 }
 
 // Pick a uniformly random empty (non-given, non-locked) cell. Returns null if none.
@@ -4067,7 +4616,13 @@ function showEndModal(room) {
   modal.classList.remove("win", "loss", "draw");
   modal.classList.add(outcome);
   $("#result-title").textContent = title;
-  $("#result-sub").textContent = sub;
+  // Say what the puzzle actually demanded — the clue count alone never did.
+  const g = (State.room && State.room.game) || {};
+  const levelName = { easy: "Easy", medium: "Medium", hard: "Hard", expert: "Expert" }[g.difficulty] || "";
+  const puzzleLine = levelName
+    ? ` ${levelName}, ${g.clues} clues${g.hardest ? ` — hardest step: ${g.hardest}` : ""}.`
+    : "";
+  $("#result-sub").textContent = sub + puzzleLine;
   $("#result-label").textContent = outcome === "win" ? "VICTORY" : outcome === "loss" ? "DEFEAT" : "RESULT";
 
   const stats = $("#result-stats");
